@@ -86,8 +86,28 @@ def ytdl_opts(**extra):
         opts["js_runtimes"] = {name: ({"path": path} if path else {})}
     if sys.platform == "win32":
         opts["compat_opts"] = {"no-certifi"}
+    # YouTube "Sign in to confirm you're not a bot": send a signed-in session's cookies
+    cookies = os.environ.get("VICE_COOKIES")
+    browser = os.environ.get("VICE_COOKIES_BROWSER")
+    if cookies and os.path.isfile(cookies) and os.path.getsize(cookies) > 50:
+        opts["cookiefile"] = cookies
+    elif browser:
+        opts["cookiesfrombrowser"] = (browser,)
     opts.update(extra)
     return opts
+
+
+BOT_CHECK = ("confirm you're not a bot", "confirm you’re not a bot", "sign in to confirm")
+
+
+COOKIE_HELP = ("YouTube asked to confirm you're not a bot [needs-cookies]. Add YouTube cookies: in Vice Desk open "
+               "Settings > YouTube sign-in (phone: Sign in to YouTube; desktop: use your browser or paste cookies.txt), "
+               "then press Retry.")
+
+
+def is_bot_check(msg):
+    m = (msg or "").lower()
+    return any(b in m for b in BOT_CHECK)
 
 
 def ytdl_search(url, limit):
@@ -221,7 +241,7 @@ def retry(fn, what, attempts=3, wait=5):
             return fn()
         except (SystemExit, Exception) as e:  # yt-dlp failures surface as SystemExit (ytdl_download) or exceptions
             msg = str(e.code if isinstance(e, SystemExit) else e)
-            if msg == "cancelled" or k == attempts:
+            if msg == "cancelled" or k == attempts or is_bot_check(msg):
                 raise
             print(f"{what} failed ({msg[:160]}); retrying in {wait * k}s ({k}/{attempts - 1})", flush=True)
             for _ in range(wait * k):

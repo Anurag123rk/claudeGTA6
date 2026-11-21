@@ -17,6 +17,7 @@
       <a data-page="find"><i>⌕</i>Find videos</a>
       <a data-page="pipeline"><i>▶</i>Pipeline</a>
       <a data-page="live" class="desk-only"><i>●</i>Live mode</a>
+      <a data-page="longform"><i>▦</i>Long-form</a>
       <a data-page="library"><i>▤</i>Clips &amp; jobs</a>
       <a data-page="monitor"><i>≋</i>Monitor <span class="pill" id="runCount" hidden>0</span></a>
       <a data-page="settings"><i>⚙</i>Settings</a>
@@ -45,15 +46,16 @@
             <label>Video URL or file path<input name="src" placeholder="https://www.youtube.com/watch?v=…  or  C:\Videos\stream.mp4" required></label>
             <div class="row">
               <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
-              <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+              <label>Layout<select name="layout"><option value="crop">Crop · follows the action</option><option value="blur">Blur background</option><option value="fill">Fill (centre crop)</option><option value="facecam">Facecam + gameplay</option><option value="react">Reaction</option></select></label>
               <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
-              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="none">No webcam</option><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
               <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             </div>
             <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
             <div class="brand-opts">
               <div class="row">
                 <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label>Card style<select name="card_theme"><option value="vice">GTA VI (Vice)</option><option value="clean">Clean</option></select></label>
                 <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
               </div>
               <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
@@ -120,15 +122,16 @@
             <label>Clips to cut<input name="clips" type="number" min="1" max="10" value="3"></label>
           </div>
           <div class="row">
-            <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+            <label>Layout<select name="layout"><option value="crop">Crop · follows the action</option><option value="blur">Blur background</option><option value="fill">Fill (centre crop)</option><option value="facecam">Facecam + gameplay</option><option value="react">Reaction</option></select></label>
               <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
-              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="none">No webcam</option><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
             <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             <label class="grow">Hook<input name="hook" maxlength="80" placeholder="optional on-screen opener"></label>
           </div>
           <div class="brand-opts">
               <div class="row">
                 <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label>Card style<select name="card_theme"><option value="vice">GTA VI (Vice)</option><option value="clean">Clean</option></select></label>
                 <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
               </div>
               <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
@@ -174,6 +177,49 @@
       </div>
     </section>
 
+    <!-- LONG-FORM -->
+    <section class="page" id="page-longform">
+      <header class="hero">
+        <div>
+          <h1>Long-form guide studio</h1>
+          <p>GTA 6 is about to make a lot of millionaires. Story-driven long-form videos hold their value and keep earning for years. This mode sets up a project in which Claude Code researches the niche, writes and fact-checks the script, voices it with ElevenLabs, builds the edit from official footage (via Apify), and grades every cut with fresh critics before uploading it as unlisted.</p>
+        </div>
+      </header>
+      <div class="card">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li><b>Study.</b> Claude finds the outliers in the niche and how the best ones are structured, or pitches concepts of its own from what players are discussing this week.</li>
+          <li><b>Story.</b> It writes three storylines, keeps the fully sourced one, and checks every claim against official sources.</li>
+          <li><b>Footage.</b> Apify collects official trailers and gameplay into a tagged library, so everything on screen is real footage.</li>
+          <li><b>Voice and music.</b> ElevenLabs voices the script with one locked professional voice and scores it; cuts land on the beat.</li>
+          <li><b>Build.</b> Claude writes an exact edit spec and builds it from a reusable component library.</li>
+          <li><b>Critics.</b> Fresh critics grade every cut blind, a judge ranks the fixes, and the loop repeats until it holds up next to the best channels.</li>
+        </ol>
+        <p class="muted small">Runs on a computer in <b>Claude Code</b>, with your own ElevenLabs, Apify and YouTube Data API accounts (their usage is billed by them). Vice Desk sets up the project; Claude Code does the work.</p>
+      </div>
+      <div class="card">
+        <form id="lfForm" class="stack">
+          <div class="row">
+            <label class="grow">Channel name<input name="channel" placeholder="Vice City Guides" required></label>
+          </div>
+          <label>Topics<input name="topics" placeholder="map guides, mission walkthroughs, hidden locations, lore"></label>
+          <div class="row end"><button class="primary" type="submit">Create project</button></div>
+        </form>
+      </div>
+      <div class="card" id="lfResult" hidden>
+        <div class="card-h"><h2>Project ready</h2><button class="sm desk-only" id="lfOpen">Open folder</button></div>
+        <p class="mono small" id="lfPath"></p>
+        <ol class="steps">
+          <li>Install Claude Code on your computer: <code>npm install -g @anthropic-ai/claude-code</code></li>
+          <li>Copy <code>.env.example</code> to <code>.env</code> in the project folder and add your ElevenLabs, Apify and YouTube keys.</li>
+          <li>Open a terminal in the project folder, run <code>claude</code> and send: <code id="lfStart"></code></li>
+        </ol>
+        <p class="muted small">The full brief is saved as <code>CLAUDE.md</code> in the folder, and Claude reads it automatically. To use it elsewhere, copy it:</p>
+        <textarea id="lfPrompt" rows="8" class="mono" readonly></textarea>
+        <div class="row end"><button class="primary" id="lfCopy">Copy prompt</button></div>
+      </div>
+    </section>
+
     <!-- LIBRARY -->
     <section class="page" id="page-library">
       <div class="card-h"><h1>Clips &amp; jobs</h1><div><button id="openWs" class="desk-only">Open folder</button> <button id="refreshJobs">Refresh</button></div></div>
@@ -195,6 +241,7 @@
       <div class="card">
         <form id="setForm" class="stack">
           <label class="desk-only">Workspace folder (jobs, clips and reports go here)<input name="workspace" class="mono"></label>
+          <label>Start mode<select name="mode"><option value="clips">Short clips</option><option value="longform">Long-form guides</option></select></label>
           <div class="row desk-only">
             <label class="grow">Speech model (captions)<select name="whisper_model"></select></label>
             <button type="button" id="dlModel">Download this model</button>
@@ -206,6 +253,25 @@
           </div>
           <div class="row end"><button class="primary" type="submit">Save</button></div>
         </form>
+      </div>
+      <div class="card" id="cookieCard">
+        <h2>YouTube sign-in <span class="muted small">(fixes "Sign in to confirm you're not a bot")</span></h2>
+        <p class="muted small">YouTube sometimes blocks downloads until it sees a signed-in session. Vice Desk then sends that session's cookies with every request. They stay on this device. A spare Google account is safest.</p>
+        <p id="cookieState" class="small"></p>
+        <div class="row android-only"><button class="primary" id="ytLogin">Sign in to YouTube</button></div>
+        <div class="row desk-only">
+          <label class="grow">Use cookies from your browser<select id="cookieBrowser">
+            <option value="">Off</option><option value="firefox">Firefox (most reliable)</option><option value="chrome">Chrome</option>
+            <option value="edge">Edge</option><option value="brave">Brave</option><option value="opera">Opera</option><option value="vivaldi">Vivaldi</option>
+            <option value="chromium">Chromium</option><option value="safari">Safari</option></select></label>
+          <button id="saveBrowser">Use this browser</button>
+        </div>
+        <details class="small"><summary>Paste a cookies.txt instead</summary>
+          <p class="muted small">Export cookies for youtube.com with a "cookies.txt" browser add-on while signed in, then paste the whole file here.</p>
+          <textarea id="cookieText" rows="5" class="mono" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;...&#9;SID&#9;..."></textarea>
+          <div class="row end"><button id="saveCookieText" class="primary">Save cookies</button></div>
+        </details>
+        <div class="row end"><button id="clearCookies" class="danger">Remove saved cookies</button></div>
       </div>
       <div class="card">
         <h2>Campaign rules <span class="muted small">(campaigns.md, used by the rule check)</span></h2>
@@ -220,6 +286,17 @@
       </div>
     </section>
   </main>
+</div>
+<div id="modePick" class="overlay" hidden>
+  <div class="welcome">
+    <div class="brand"><span class="logo">V</span><div><b>Welcome to Vice Desk</b><small>what are you making?</small></div></div>
+    <h1>Choose how you'll work</h1>
+    <div class="models">
+      <div class="model rec"><b>Short clips</b><span class="sz">TikTok · Reels · Shorts</span><p>Find trending GTA 6 videos and streams, pick the best moments, and cut vertical clips with captions, crop tracking, GTA VI cards and your @account.</p><button class="primary" data-mode="clips">Make short clips</button></div>
+      <div class="model"><b>Long-form guides</b><span class="sz">YouTube · Claude Code</span><p>Story-driven map guides, walkthroughs and lore videos that keep earning for years: researched, fact-checked, voiced and edited by Claude Code with ElevenLabs and Apify.</p><button data-mode="longform">Set up long-form</button></div>
+    </div>
+    <p class="muted small">You can switch any time in Settings.</p>
+  </div>
 </div>
 <div id="firstRun" class="overlay" hidden>
   <div class="welcome">
@@ -238,15 +315,16 @@
     <input type="hidden" name="src">
     <div class="row">
       <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
-      <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+      <label>Layout<select name="layout"><option value="crop">Crop · follows the action</option><option value="blur">Blur background</option><option value="fill">Fill (centre crop)</option><option value="facecam">Facecam + gameplay</option><option value="react">Reaction</option></select></label>
       <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
-              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="none">No webcam</option><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
       <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
     </div>
     <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
     <div class="brand-opts">
               <div class="row">
                 <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label>Card style<select name="card_theme"><option value="vice">GTA VI (Vice)</option><option value="clean">Clean</option></select></label>
                 <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
               </div>
               <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>

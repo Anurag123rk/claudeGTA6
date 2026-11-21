@@ -1,11 +1,25 @@
-## Vice Desk 2.0.6: Windows, macOS, Linux and Android
+## Vice Desk 2.1.0: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.6-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.0.6-linux-x86_64` | `chmod +x ViceDesk-2.0.6-linux-x86_64 && ./ViceDesk-2.0.6-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.6.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.1.0-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.1.0-linux-x86_64` | `chmod +x ViceDesk-2.1.0-linux-x86_64 && ./ViceDesk-2.1.0-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.1.0.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### New in 2.1.0
+- **Fix for "Sign in to confirm you're not a bot".** YouTube blocks anonymous downloads from many connections, mobile data especially. The fix is a signed-in session's cookies. Open **Settings → YouTube sign-in**:
+  - **Phone:** tap **Sign in to YouTube**, sign in (a spare Google account is safest), then tap **Save**. The cookies stay on the phone.
+  - **Desktop:** pick your browser (Firefox is most reliable), or paste a cookies.txt.
+
+  Then press **Retry** on the failed task; the error itself now has a **Fix** button that takes you there. Bot checks are no longer retried, so the app doesn't hammer YouTube.
+- **Crop · follows the action** (the new default layout): a true 9:16 crop (no blur bars) that tracks where the action is. Static HUD and overlays are ignored, and the pan is smoothed and speed-limited. Pick a webcam position and the webcam goes on top with tracked gameplay below; Facecam clips track too. The punch-in zooms on the tracked action.
+- **GTA VI card style** (default; "Clean" is still available):
+  - **Context card:** moved lower. A sunset stripe and "GTA VI · WHAT YOU'RE WATCHING" tag, then the title in slanted heavy type with a neon glow, sliding in.
+  - **End card:** pink and orange stripes sweep in, your @account slams in with a glow, five wanted-level stars light up one by one, then "FOLLOW FOR MORE GTA VI".
+- **Choose your mode at start:** Short clips, or **Long-form guides**. Long-form sets up a Claude Code project for story-driven GTA 6 guides: research → fact-checked script → ElevenLabs voice → official footage via Apify → spec-built edit → blind critic loop → unlisted YouTube upload. You get the stage folders, status and rules files, an .env template for your keys, and the full brief as CLAUDE.md with a Copy button. It runs in Claude Code on a computer, with your own ElevenLabs, Apify and YouTube accounts.
+- **Android:** the app no longer slides under the status bar, notch or camera cutout, or the keyboard, on any phone.
+- **Fixed:** finding moments crashed on videos shorter than 30 seconds.
 
 ### New in 2.0.6
 - **Context intro.** For the first 3 seconds, a pill under the hook says what the video is about. It's written from the video's title (emoji, hashtags and "| Episode 3" style tails removed, plus "via <channel>"), or you can type your own.

@@ -10,7 +10,7 @@ import argparse, json, math, os, re, sys, wave
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
-from common import ffprobe, is_url, job_dir, load_json, media_ok, progress, retry, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
+from common import COOKIE_HELP, ffprobe, is_bot_check, is_url, job_dir, load_json, media_ok, progress, retry, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
 
 HYPE = re.compile(r"\b(no way|oh my god|omg|what|wait|bro|let'?s go|holy|insane|crazy|yo+|wtf|dude|look at|nah|run|go go)\b", re.I)
 CHAT_HYPE = re.compile(r"(LMAO|LOL|KEKW|OMEGALUL|W+\b|CLIP|💀|😂|🔥|NO WAY|HOLY)", re.I)
@@ -23,6 +23,8 @@ def fetch(src, d, max_min):
         try:
             info = retry(lambda: ytdl_info(src), "reading video info")
         except Exception as e:
+            if is_bot_check(str(e)):
+                sys.exit(COOKIE_HELP)
             sys.exit(f"could not read this video: {str(e).replace('ERROR: ', '')[:300]}")
         save_json(d / "info.json", {k: info.get(k) for k in ("id", "title", "uploader", "channel", "uploader_id", "webpage_url",
                                                              "duration", "view_count", "upload_date", "heatmap", "is_live", "was_live")})
@@ -41,7 +43,12 @@ def fetch(src, d, max_min):
             long = (info.get("duration") or 0) > max_min * 60
             tmp = d / "download.mp4"  # renamed to source.mp4 only once it is complete and readable
             tmp.unlink(missing_ok=True)  # a finished-but-broken file; yt-dlp's .part files are kept and resumed
-            retry(lambda: ytdl_download(src, tmp, fmt, max_seconds=max_min * 60 if long else None), "download")
+            try:
+                retry(lambda: ytdl_download(src, tmp, fmt, max_seconds=max_min * 60 if long else None), "download")
+            except SystemExit as e:
+                if is_bot_check(str(e.code)):
+                    sys.exit(COOKIE_HELP)
+                raise
             if not media_ok(tmp):
                 tmp.unlink(missing_ok=True)
                 sys.exit("the download finished but the file is damaged (connection dropped?). Please run it again.")
@@ -150,7 +157,7 @@ def z(a):
 
 
 def smooth(a, k):
-    k = max(1, int(k))
+    k = max(1, min(int(k), len(a)))  # a window longer than the clip would change the array length
     return np.convolve(a, np.ones(k) / k, mode="same")
 
 

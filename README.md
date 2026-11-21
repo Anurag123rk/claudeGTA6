@@ -23,6 +23,8 @@
 
 **[Download from Releases](https://github.com/Anurag123rk/claudeGTA6/releases/latest)**: `ViceDesk.exe` for Windows, a `.dmg` for macOS (Apple silicon), a single binary for Linux, or `ViceDesk-<version>.apk` for Android 10+. No Python, no login, no cloud backend.
 
+Choose **Short clips** or **Long-form guides** at start; long-form sets up a Claude Code project (research → script → ElevenLabs voice → Apify footage → critic loop → YouTube). If YouTube says "confirm you're not a bot", sign in under Settings → YouTube sign-in.
+
 The Android app runs the same pipeline on your phone (no captions there: the speech engine has no Android build). Share a YouTube/Twitch link to it, then share the finished clip straight to TikTok, Instagram or YouTube. It's built from [`android/`](android) with Chaquopy.
 
 - **Paste a video, get clips.** The full pipeline runs in one click: download → transcribe → score moments → cut 1080x1920 clips → rule check.

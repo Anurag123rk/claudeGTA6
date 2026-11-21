@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.0.6"
+VERSION = "2.1.0"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -74,7 +74,8 @@ def default_workspace():
 
 
 class Settings:
-    DEFAULTS = {"workspace": "", "whisper_model": "small", "model_choice_done": "", "twitch_client_id": "", "twitch_token": ""}
+    DEFAULTS = {"workspace": "", "whisper_model": "small", "model_choice_done": "", "twitch_client_id": "", "twitch_token": "",
+                "cookies_browser": "", "mode": "", "longform_channel": ""}
 
     def __init__(self):
         self.path = config_dir() / "settings.json"
@@ -109,6 +110,40 @@ class Settings:
 SETTINGS = Settings()
 
 
+def cookies_file():
+    """Netscape cookies.txt for yt-dlp (YouTube bot check). Written by the phone's in-app sign-in or pasted."""
+    return config_dir() / "youtube_cookies.txt"
+
+
+def cookie_status():
+    f = cookies_file()
+    if f.exists():
+        names = [ln.split("\t")[5] for ln in f.read_text(encoding="utf-8", errors="ignore").splitlines()
+                 if ln and (not ln.startswith("#") or ln.startswith("#HttpOnly_")) and ln.count("\t") >= 6]
+        signed = any(n in ("SID", "__Secure-3PSID", "LOGIN_INFO", "SAPISID") for n in names)
+        return {"source": "file", "cookies": len(names), "signed_in": signed,
+                "updated": f.stat().st_mtime}
+    if SETTINGS.data.get("cookies_browser"):
+        return {"source": "browser", "browser": SETTINGS.data["cookies_browser"], "signed_in": None}
+    return {"source": None, "signed_in": False}
+
+
+def save_cookies_text(text):
+    """Accept a pasted cookies.txt (Netscape format, as exported by browser add-ons). Keeps YouTube/Google rows."""
+    rows = []
+    for ln in (text or "").splitlines():
+        ln = ln.strip("\r")
+        if not ln or ln.startswith("#") and not ln.startswith("#HttpOnly_"):
+            continue
+        parts = ln.split("\t")
+        if len(parts) >= 7 and ("youtube.com" in parts[0] or "google.com" in parts[0]):
+            rows.append(ln)
+    if not rows:
+        raise ValueError("no YouTube cookies found: paste a cookies.txt (Netscape format) exported while signed in to YouTube")
+    cookies_file().write_text("# Netscape HTTP Cookie File\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    return len(rows)
+
+
 def child_env(extra=None):
     env = dict(os.environ)
     env["PATH"] = os.pathsep.join([str(bundle_dir() / "bin"), str(bin_dir()), env.get("PATH", "")])
@@ -116,6 +151,10 @@ def child_env(extra=None):
     env["PYTHONIOENCODING"] = "utf-8"
     env["CLIP_DESK_HOME"] = str(SETTINGS.workspace)
     env["WHISPER_MODEL"] = whisper_model_ref(SETTINGS.data.get("whisper_model") or "base")
+    if cookies_file().exists():
+        env["VICE_COOKIES"] = str(cookies_file())
+    if SETTINGS.data.get("cookies_browser"):
+        env["VICE_COOKIES_BROWSER"] = SETTINGS.data["cookies_browser"]
     if SETTINGS.data.get("twitch_client_id") and SETTINGS.data.get("twitch_token"):
         env["TWITCH_CLIENT_ID"] = SETTINGS.data["twitch_client_id"]
         env["TWITCH_TOKEN"] = SETTINGS.data["twitch_token"]
@@ -678,6 +717,7 @@ def _cut_args(job, n, p):
     if p.get("outro") and handle:
         a += ["--outro-handle", handle]
     a += ["--bg", p.get("bg") or "blur", "--bg-color", p.get("bg_color") or "vice"]
+    a += ["--card-theme", p.get("card_theme") or "vice"]
     if p.get("punch"):
         a += ["--punch", 0.15]
     if p.get("clean_audio"):
@@ -742,9 +782,9 @@ def _clip_done(job, n, p):
             "fps": 60 if p.get("fps60") else 30, "hook": p.get("hook") or "",
             "bg": p.get("bg") or "blur", "bg_color_name": p.get("bg_color") or "vice",
             "outro_handle": (p.get("handle") or "").strip() if p.get("outro") else "",
-            "context_on": bool(p.get("context"))}
+            "context_on": bool(p.get("context")), "card_theme": p.get("card_theme") or "vice"}
     return all(m.get(k, want[k]) == v for k, v in want.items() if k != "layout") and \
-        (m.get("layout") == want["layout"] or want["layout"] in ("facecam", "react"))  # facecam may fall back to blur
+        (m.get("layout") == want["layout"] or want["layout"] in ("facecam", "react", "crop"))  # facecam may fall back to blur
 
 
 def runner_pipeline(p):

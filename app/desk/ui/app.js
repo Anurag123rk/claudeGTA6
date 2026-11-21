@@ -140,6 +140,7 @@ function taskCard(t, opts = {}) {
       <div><span>ETA</span><br>${live && d.eta != null ? fmtDur(d.eta) : "–"}</div><div><span>Source</span><br>${esc(d.source || "")}</div>
       <svg data-spark="${t.id}"></svg></div>` : ""}
     ${t.error ? `<div class="err">${esc(t.error)}</div>` : ""}
+    ${t.error && /needs-cookies|not a bot/i.test(t.error) ? `<div class="res"><button class="sm primary" data-fixcookies="1">Fix: sign in to YouTube</button><span class="muted small">then press Retry</span></div>` : ""}
     ${["failed", "cancelled"].includes(t.state) ? `<div class="res"><button class="sm primary" data-retry="${t.id}">↻ Retry</button><span class="muted small">continues from where it stopped</span></div>` : ""}
     ${live && t.last && !opts.noLast ? `<div class="last">${esc(t.last)}</div>` : ""}
     ${res}</div>`;
@@ -235,7 +236,8 @@ async function loadStatus() {
     $("#toolList").innerHTML = Object.entries(s.tools).map(([k, v]) => `<li><span>${names[k] || k}<br><span class="muted small mono">${esc(v.path || "missing")}</span></span><span class="st ${v.ok ? "ok" : "bad"}">${v.ok ? "✓ ready" : "✗ missing"}</span></li>`).join("");
     renderModelCards(s); fillModelSelect(s);
     const modelBusy = S.tasks.some((x) => x.kind === "install_model" && x.state === "running");
-    if (s.first_run || modelBusy) $("#firstRun").hidden = false;
+    if (!s.settings.mode) { $("#modePick").hidden = false; }  // first start: clips or long-form
+    else if (s.first_run || modelBusy) $("#firstRun").hidden = false;
     const b = $("#setupBanner");
     if (!s.tools.ffmpeg.ok || !s.tools.ffprobe.ok) {
       b.hidden = false;
@@ -342,18 +344,19 @@ function syncCam(form) {
   const lay = form.elements.layout ? form.elements.layout.value : "blur";
   const vertical = !form.elements.platform || form.elements.platform.value === "vertical";
   const camLabel = form.querySelector(".cam-only");
-  if (camLabel) camLabel.hidden = !(["facecam", "react"].includes(lay) && vertical);
+  if (camLabel) camLabel.hidden = !((["facecam", "react"].includes(lay) && vertical) || lay === "crop");
   const bgLabel = form.querySelector(".bg-only"), pal = form.querySelector(".bg-color-only");
   if (bgLabel) bgLabel.hidden = lay !== "blur";
   if (pal) pal.hidden = !(lay === "blur" && form.elements.bg && form.elements.bg.value !== "blur");
   const ctx = form.querySelector(".ctx-text");
   if (ctx && form.elements.context) ctx.hidden = !form.elements.context.checked;
   const cam = form.elements.cam;  // phones cannot auto-detect the webcam (no OpenCV): default to a corner
-  if (cam && (AND || (S.status && S.status.android)) && cam.value === "auto") cam.value = "top-right";
+  if (cam && (AND || (S.status && S.status.android)) && cam.value === "auto") cam.value = lay === "crop" ? "none" : "top-right";
+  if (cam && lay === "facecam" && cam.value === "none") cam.value = (AND || (S.status && S.status.android)) ? "top-right" : "auto";
 }
 $$("form").forEach((f) => { if (f.elements.layout) { f.addEventListener("change", () => syncCam(f)); syncCam(f); } });
 
-const CLIP_KEYS = ["clips", "layout", "platform", "cam", "captions", "punch", "clean_audio", "fps60", "bg", "bg_color", "context", "outro"];
+const CLIP_KEYS = ["clips", "layout", "platform", "cam", "captions", "punch", "clean_audio", "fps60", "bg", "bg_color", "context", "outro", "card_theme"];
 // the @account is remembered across forms and launches
 function loadHandle() { try { return localStorage.getItem("vd-handle") || ""; } catch (e) { return ""; } }
 $$("input[name=handle]").forEach((el) => {
@@ -385,7 +388,7 @@ $("#clipForm").addEventListener("submit", (e) => {
 $("#clipClose").addEventListener("click", () => $("#clipDialog").close());
 $("#clipMore").addEventListener("click", () => {  // hand over to the full Pipeline form (moments, lengths, caption check)
   const f = $("#clipForm"), p = $("#pipeForm");
-  for (const k of ["src", "layout", "platform", "cam", "captions", "hook", "clips", "bg", "bg_color", "handle", "context_text"]) if (p.elements[k] && f.elements[k]) p.elements[k].value = f.elements[k].value;
+  for (const k of ["src", "layout", "platform", "cam", "captions", "hook", "clips", "bg", "bg_color", "handle", "context_text", "card_theme"]) if (p.elements[k] && f.elements[k]) p.elements[k].value = f.elements[k].value;
   for (const k of ["punch", "clean_audio", "fps60", "context", "outro"]) if (p.elements[k] && f.elements[k]) p.elements[k].checked = f.elements[k].checked;
   syncCam(p); $("#clipDialog").close(); go("pipeline"); p.elements.src.focus();
 });
@@ -415,7 +418,7 @@ document.addEventListener("click", (e) => {
   const f = formData($("#pipeForm"));
   run("cut", { job: b.dataset.job, pick: b.dataset.cut, layout: lay ? lay.value : "blur", hook: f.hook, captions: f.captions, caption: f.caption,
     punch: f.punch, clean_audio: f.clean_audio, fps60: f.fps60, platform: f.platform, cam: f.cam,
-    bg: f.bg, bg_color: f.bg_color, context: f.context, context_text: f.context_text, outro: f.outro, handle: f.handle }, "pipeTask");
+    bg: f.bg, bg_color: f.bg_color, context: f.context, context_text: f.context_text, outro: f.outro, handle: f.handle, card_theme: f.card_theme }, "pipeTask");
 });
 
 // ---------------------------------------------------------------- live
@@ -457,14 +460,66 @@ function play(file, name) {
 }
 $("#closePlayer").addEventListener("click", () => { const v = $("#video"); v.pause(); v.removeAttribute("src"); v.load(); $("#player").close(); });
 
+// ---------------------------------------------------------------- YouTube cookies (bot check)
+function renderCookies(c) {
+  const el = $("#cookieState"); if (!el || !c) return;
+  if (c.source === "file") el.innerHTML = c.signed_in
+    ? `<span class="ok">✓ Signed in</span>: ${c.cookies} cookies saved ${new Date(c.updated * 1000).toLocaleString()}`
+    : `<span class="warn">Cookies saved (${c.cookies}) but no sign-in found.</span> Sign in again.`;
+  else if (c.source === "browser") el.innerHTML = `<span class="ok">✓ Using cookies from ${esc(c.browser)}</span>. Stay signed in to YouTube there (and close the browser if it reports a locked database).`;
+  else el.innerHTML = `<span class="muted">Not set up.</span>`;
+  const sel = $("#cookieBrowser"); if (sel) sel.value = c.source === "browser" ? c.browser : "";
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-fixcookies]")) { e.stopPropagation(); go("settings"); setTimeout(() => $("#cookieCard").scrollIntoView({ behavior: "smooth" }), 150); }
+});
+$("#ytLogin").addEventListener("click", () => { if (AND && AND.youtubeLogin) AND.youtubeLogin(); else toast("Update the app to sign in from the phone."); });
+window.onCookiesSaved = (n, ok) => { toast(ok ? `Signed in: ${n} YouTube cookies saved. Press <b>Retry</b> on the failed task.` : "Sign-in cancelled."); loadSettings(); };
+$("#saveBrowser").addEventListener("click", async () => {
+  try { await api("/api/settings", { cookies_browser: $("#cookieBrowser").value }); toast("Saved. Downloads now use that browser's YouTube sign-in."); loadSettings(); }
+  catch (er) { toast(esc(er.message)); }
+});
+$("#saveCookieText").addEventListener("click", async () => {
+  try { const r = await api("/api/cookies", { text: $("#cookieText").value }); $("#cookieText").value = ""; renderCookies(r.cookies); toast(`Saved ${r.rows} cookies. Press <b>Retry</b> on the failed task.`); }
+  catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`, 7000); }
+});
+$("#clearCookies").addEventListener("click", async () => { const r = await api("/api/cookies/clear", {}); renderCookies(r.cookies); toast("Saved cookies removed."); });
+
+// ---------------------------------------------------------------- start mode + long-form studio
+document.addEventListener("click", async (e) => {
+  const m = e.target.closest("[data-mode]"); if (!m) return;
+  await api("/api/settings", { mode: m.dataset.mode }).catch(() => {});
+  $("#modePick").hidden = true;
+  if (m.dataset.mode === "longform") go("longform"); else { go("dashboard"); loadStatus(); }
+});
+$("#lfForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api("/api/longform/create", formData(e.target));
+    $("#lfResult").hidden = false; $("#lfPath").textContent = r.path; $("#lfStart").textContent = r.start;
+    $("#lfPrompt").value = r.prompt; $("#lfOpen").dataset.open = r.path;
+    $("#lfResult").scrollIntoView({ behavior: "smooth" }); toast("Project created.");
+  } catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`); }
+});
+$("#lfOpen").addEventListener("click", () => api("/api/open", { path: $("#lfOpen").dataset.open }).catch((er) => toast(esc(er.message))));
+$("#lfCopy").addEventListener("click", async () => {
+  const t = $("#lfPrompt");
+  try { await navigator.clipboard.writeText(t.value); }
+  catch (er) { t.select(); document.execCommand("copy"); }
+  toast("Prompt copied. Paste it into Claude Code.");
+});
+
 // ---------------------------------------------------------------- settings
 async function loadSettings() {
   try {
     const s = await api("/api/status"); const f = $("#setForm");
     fillModelSelect(s);
     for (const [k, v] of Object.entries(s.settings)) if (f.elements[k] && k !== "twitch_token" && k !== "whisper_model") f.elements[k].value = v;
+    if (f.elements.mode && !s.settings.mode) f.elements.mode.value = "clips";
+    if (s.settings.longform_channel && !$("#lfForm [name=channel]").value) $("#lfForm [name=channel]").value = s.settings.longform_channel;
     f.elements.twitch_token.placeholder = s.settings.twitch_token ? "saved (leave empty to keep)" : "optional";
     const c = await api("/api/text?name=campaigns.md"); $("#campaigns").value = c.text;
+    renderCookies(s.cookies);
   } catch (e) { toast(esc(e.message)); }
 }
 $("#setForm").addEventListener("submit", async (e) => {

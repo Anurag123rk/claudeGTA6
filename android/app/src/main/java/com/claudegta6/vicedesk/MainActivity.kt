@@ -72,7 +72,7 @@ class MainActivity : Activity() {
     private var pendingShare: String? = null
     private var loaded = false
 
-    companion object { const val REQ_PICK = 41 }
+    companion object { const val REQ_PICK = 41; const val REQ_LOGIN = 43 }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,7 +101,9 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#F4E9F2")); textSize = 18f
             gravity = Gravity.CENTER; setBackgroundColor(bg)
         }
-        setContentView(FrameLayout(this).apply { addView(web); addView(splash) })
+        val root = FrameLayout(this).apply { setBackgroundColor(bg); addView(web); addView(splash) }
+        Insets.applySafeArea(root)  // no overlap with the status bar, notch/cutout, nav bar or keyboard
+        setContentView(root)
         handleShare(intent)
         Thread {
             try {
@@ -173,6 +175,11 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_LOGIN) {
+            val n = data?.getIntExtra("count", 0) ?: 0
+            web.evaluateJavascript("window.onCookiesSaved && window.onCookiesSaved($n, ${resultCode == RESULT_OK})", null)
+            return
+        }
         if (requestCode != REQ_PICK || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         message("Copying the video into Vice Desk…")
@@ -220,6 +227,11 @@ class MainActivity : Activity() {
         @JavascriptInterface fun setBusy(text: String) {
             if (text.isNotBlank()) askNotifications()
             EngineService.update(applicationContext, text)
+        }
+
+        /** Opens the in-app YouTube sign-in; the cookies it saves fix "Sign in to confirm you're not a bot". */
+        @JavascriptInterface fun youtubeLogin() = runOnUiThread {
+            @Suppress("DEPRECATION") startActivityForResult(Intent(this@MainActivity, YoutubeLoginActivity::class.java), REQ_LOGIN)
         }
 
         @JavascriptInterface fun pickVideo() = runOnUiThread {

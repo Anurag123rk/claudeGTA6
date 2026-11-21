@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import quote_plus
 sys.path.insert(0, str(Path(__file__).parent))
-from common import progress, stage, ytdl_info, ytdl_search
+from common import COOKIE_HELP, is_bot_check, progress, stage, ytdl_info, ytdl_search
 
 UPLOAD_DATE_SORT = "&sp=CAI%253D"  # YouTube search sorted by upload date
 
@@ -27,7 +27,7 @@ def main():
     try:
         entries = ytdl_search(f"https://www.youtube.com/results?search_query={quote_plus(a.query)}{UPLOAD_DATE_SORT}", a.limit)
     except Exception as e:
-        sys.exit(f"YouTube search failed: {str(e).replace('ERROR: ', '')[:300]}")
+        sys.exit(COOKIE_HELP if is_bot_check(str(e)) else f"YouTube search failed: {str(e).replace('ERROR: ', '')[:300]}")
     print(f"search: {len(entries)} results in {time.time() - t0:.1f}s", flush=True)
 
     now = time.time(); rows = []; skipped = 0

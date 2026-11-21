@@ -143,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
                                "settings": core.SETTINGS.public(), "workspace": str(core.SETTINGS.workspace),
                                "platform": sys.platform, "frozen": core.FROZEN, "bin": str(core.bin_dir()),
                                "models": core.WHISPER_MODELS, "installed_models": core.installed_models(),
-                               "android": core.IS_ANDROID,
+                               "android": core.IS_ANDROID, "cookies": core.cookie_status(),
                                "first_run": (not core.IS_ANDROID and not core.SETTINGS.data.get("model_choice_done")
                                              and not core.installed_models())})
         if path == "/api/events":
@@ -233,6 +233,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, "not a web link")
             webbrowser.open(url)
             return self._json({"ok": True})
+        if path == "/api/longform/create":
+            from desk import longform
+            r = longform.create_project(core.SETTINGS.workspace, b.get("channel"), b.get("topics"))
+            core.SETTINGS.update(longform_channel=r["channel"])
+            return self._json(r)
+        if path == "/api/cookies":
+            try:
+                n = core.save_cookies_text(b.get("text") or "")
+            except ValueError as e:
+                return self._err(400, str(e))
+            return self._json({"ok": True, "rows": n, "cookies": core.cookie_status()})
+        if path == "/api/cookies/clear":
+            core.cookies_file().unlink(missing_ok=True)
+            core.SETTINGS.update(cookies_browser="")
+            return self._json({"ok": True, "cookies": core.cookie_status()})
         if path == "/api/campaigns":
             (core.SETTINGS.workspace / "campaigns.md").write_text(str(b.get("text") or ""), encoding="utf-8")
             return self._json({"ok": True})

@@ -11,8 +11,10 @@ Also writes clip_<n>.srt and clip_<n>.ass next to the clip, for finishing touche
 import argparse, os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
+import cards
 from common import load_json, run_ffmpeg, save_json, stage, tool
 
+CARD_STYLES = cards.STYLES
 W, H = 1080, 1920  # set per --platform in main()
 PLATFORMS = {  # output frame per destination
     "vertical": (1080, 1920),   # TikTok, Instagram Reels, YouTube Shorts, Snapchat
@@ -134,41 +136,8 @@ def context_from_title(title, channel=""):
     return t
 
 
-def brand_events(dur, context, handle, accent, has_hook, pill=None):
-    """Context banner for the first seconds and an animated @handle end card for the last 2.5 s."""
-    ev = []
-    acc = tag_color(accent)
-    pill_c = tag_color(pill or accent)
-    if context:
-        y = int(H * (0.19 if has_hook else 0.085))
-        end = min(3.4, max(1.5, dur - 0.5))
-        # small accent tag + dark pill, sliding down into place
-        ev.append(f"Dialogue: 3,{ts(0.15)},{ts(end)},Ctx,,0,0,0,,{{\\an8\\move({W // 2},{y - 40},{W // 2},{y},0,260)"
-                  f"\\fad(220,260)\\3c{pill_c}}}{esc(context)}")
-    if handle and dur >= 5:
-        h = handle.strip()
-        h = h if h.startswith("@") else "@" + h
-        t0 = max(0.0, dur - 2.5)
-        cy = H // 2
-        bar_w = min(int(W * 0.62), 60 + 44 * len(h))
-        ev += [
-            # dim the frame
-            f"Dialogue: 4,{ts(t0)},{ts(dur)},Fx,,0,0,0,,{{\\an7\\pos(0,0)\\p1\\1c&H000000&\\1a&HFF&\\t(0,350,\\1a&H50&)\\bord0\\shad0}}"
-            f"m 0 0 l {W} 0 {W} {H} 0 {H}{{\\p0}}",
-            # @handle pops in (overshoot then settle)
-            f"Dialogue: 5,{ts(t0 + 0.12)},{ts(dur)},Handle,,0,0,0,,{{\\an5\\pos({W // 2},{cy})\\fad(150,0)"
-            f"\\fscx55\\fscy55\\t(0,260,\\fscx108\\fscy108)\\t(260,420,\\fscx100\\fscy100)}}{esc(h)}",
-            # accent underline grows from the centre
-            f"Dialogue: 5,{ts(t0 + 0.35)},{ts(dur)},Fx,,0,0,0,,{{\\an5\\pos({W // 2},{cy + 78})\\p1\\1c{acc}\\bord0\\shad0"
-            f"\\fscx0\\t(0,380,\\fscx100)}}m 0 0 l {bar_w} 0 {bar_w} 12 0 12{{\\p0}}",
-            # 'Follow for more' fades up
-            f"Dialogue: 5,{ts(t0 + 0.6)},{ts(dur)},OutroSub,,0,0,0,,{{\\an5\\move({W // 2},{cy + 150},{W // 2},{cy + 132},0,300)"
-            f"\\alpha&HFF&\\t(0,300,\\alpha&H00&)}}Follow for more",
-        ]
-    return ev
-
-
-def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False, context="", handle="", accent=None, pill=None):
+def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False, context="", handle="", accent=None, pill=None,
+              theme="vice"):
     hdr = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -182,11 +151,7 @@ Style: Hook,Inter Black,68,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,
 Style: TitleBox,Inter Black,66,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,1,0,0,5,40,40,0,1
 Style: TitleOut,Inter Black,80,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,9,2,8,50,50,0,1
 Style: Bubble,Inter,58,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,5,60,60,0,1
-Style: Ctx,Inter,46,&H00FFFFFF,&H00FFFFFF,&H00E8457F,&H40140B18,-1,0,0,0,100,100,1,0,3,14,0,8,60,60,0,1
-Style: Handle,Inter Black,104,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,4,5,40,40,0,1
-Style: OutroSub,Inter,50,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,2,0,1,3,2,5,40,40,0,1
-Style: Fx,Inter,20,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
-
+{CARD_STYLES}
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
@@ -227,11 +192,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         hook = ''
     if hook:
         ev.append(f"Dialogue: 1,{ts(0)},{ts(hook_end)},Hook,,0,0,0,,{{\\fad(0,180)\\fscx92\\fscy92\\t(0,120,\\fscx100\\fscy100)}}{esc(hook)}")
-    ev += brand_events(dur, context, handle, accent or "#e8457f", bool(hook), pill)
+    ev += cards.events(theme, W, H, dur, context, handle, accent or "#e8457f", bool(hook), pill)
     return hdr + "\n".join(ev) + "\n"
 
 
-CAP_Y = {"fill": 1380, "blur": 1460, "facecam": 1120, "react": 1560}
+CAP_Y = {"fill": 1380, "blur": 1460, "facecam": 1120, "react": 1560, "crop": 1380}
 TOP = 730  # react layout: face panel height = seam y (even)
 GAME_H = H - TOP  # 1190
 
@@ -247,9 +212,12 @@ def punch_filter(a, b, z):
 
 
 def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, punch=None, fps=30,
-                 bg="blur", bg_color=None):
+                 bg="blur", bg_color=None, track=None):
     """Layout + burned-caption filter graph ending in [vo]. Reused by translate.py."""
-    if layout == "fill":
+    if layout == "crop":  # true crop to the output shape, following the action (track = x expression in t)
+        x = track or "(iw-ow)/2"
+        v = f"[0:v]crop=w='min(iw,ih*{W}/{H})':h=ih:x='{x}':y=0,scale={W}:{H},setsar=1[v]"
+    elif layout == "fill":
         v = f"[0:v]scale=-2:{H},crop={W}:{H}[v]"
     elif layout == "blur":
         lift = 80 if H > W else 0
@@ -285,7 +253,9 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         x, y, w, h = map(float, cam.split(":"))
         ch = even(H * 0.38); gh = H - ch  # even heights: odd ones get rounded and the frame ends up 2 px short
         v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{ch}:force_original_aspect_ratio=increase,"
-             f"crop={W}:{ch}[cam];[b]scale=-2:{gh},crop={W}:{gh}[game];[cam][game]vstack[v]")
+             f"crop={W}:{ch}[cam];" + (
+                 f"[b]crop=w='min(iw,ih*{W}/{gh})':h=ih:x='{track}':y=0,scale={W}:{gh},setsar=1[game];" if track else
+                 f"[b]scale=-2:{gh},crop={W}:{gh}[game];") + "[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
     # bundled Inter fonts: the same look on every platform, and text renders even where system fonts are missing
     fonts = str(Path(__file__).resolve().parent / "fonts")
@@ -343,7 +313,9 @@ def game_offset(video, s0, e0, src, cam_box):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("job"); ap.add_argument("--pick", type=int, default=1)
-    ap.add_argument("--layout", choices=["fill", "blur", "facecam", "react"], default="blur")
+    ap.add_argument("--layout", choices=["fill", "blur", "facecam", "react", "crop"], default="blur",
+                    help="crop = true crop that follows the action (with --cam, the webcam goes on top)")
+    ap.add_argument("--no-track", action="store_true", help="crop/facecam: keep the crop centred instead of tracking")
     ap.add_argument("--title", default="", help="reaction title, e.g. 'Speed REALIZED why GTA 6 took 13 YEARS'")
     ap.add_argument("--title-style", choices=["box", "outline"], default="box")
     ap.add_argument("--title-secs", type=float, default=0, help="0 = whole clip")
@@ -356,6 +328,7 @@ def main():
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
     ap.add_argument("--context", default="", help='"auto" = a line about the video from its title, or your own text')
     ap.add_argument("--outro-handle", default="", help="end the clip with an animated card showing this @account")
+    ap.add_argument("--card-theme", choices=["vice", "clean"], default="vice", help="look of the context and end cards")
     ap.add_argument("--bg", choices=["blur", "tint", "solid"], default="blur", help="background of the blur layout")
     ap.add_argument("--bg-color", default="vice", help="palette name (" + ", ".join(PALETTE) + ") or #rrggbb")
     ap.add_argument("--punch", type=float, default=0, help="zoom in this much on the peak moment, e.g. 0.15 (0 = off)")
@@ -366,6 +339,10 @@ def main():
     W, H = PLATFORMS[a.platform]
     GAME_H = H - TOP
     a.cam = CAM_PRESETS.get(a.cam, a.cam)
+    if a.layout == "crop" and a.cam not in ("auto", "none", ""):
+        a.layout = "facecam" if a.platform == "vertical" else "crop"  # webcam on top + tracked gameplay below
+    if a.layout == "crop":
+        a.cam = "none"
     if a.platform != "vertical" and a.layout in ("facecam", "react"):
         print(f"{a.layout} layout stacks the webcam above the game, which needs a 9:16 frame: using blur for {a.platform}")
         a.layout = "blur"
@@ -445,7 +422,7 @@ def main():
         accent = "#e8457f"
     ass.write_text(build_ass(cap_words, s0, e0, a.hook, cap_y, title=title, caps=caps, profanity=a.allow_profanity,
                              context=context, handle=a.outro_handle, accent=accent,
-                             pill="#141018" if a.bg == "solid" else None), encoding="utf-8")  # dark pill on flat colour
+                             pill="#141018" if a.bg == "solid" else None, theme=a.card_theme), encoding="utf-8")  # dark pill on flat colour
     src = None; gx = None
     if layout == 'react':
         from common import ffprobe
@@ -458,7 +435,24 @@ def main():
         peak = min(max(peak, 0.5), max(0.5, e0 - s0 - 1.0))
         punch = (max(0.0, peak - 0.4), min(e0 - s0, peak + 1.8), min(a.punch, 0.4))
         print(f"punch-in at {peak:.1f}s (+{punch[2] * 100:.0f}%)")
-    v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr,
+    track = None
+    if layout in ("crop", "facecam") and not a.no_track:
+        try:
+            from tracking import crop_x_expr, track_centers
+            from common import ffprobe as _probe
+            vs = [x for x in _probe(c['source'])['streams'] if x.get('codec_type') == 'video'][0]
+            sw_, sh_ = int(vs['width']), int(vs['height'])
+            out_h = H if layout == "crop" else H - even(H * 0.38)
+            win = min(1.0, sh_ * W / out_h / sw_)
+            excl = [float(t) for t in cam.split(':')] if layout == "facecam" and cam.count(':') == 3 else None
+            path = track_centers(c['source'], s0, e0, win, exclude=excl)
+            if path:
+                track = crop_x_expr(path)
+                span = max(p_[1] for p_ in path) - min(p_[1] for p_ in path)
+                print(f"tracking: following the action ({len(path)} samples, pans across {span * 100:.0f}% of the frame)")
+        except Exception as ex:  # tracking is a bonus: never fail the clip over it
+            print(f"tracking unavailable ({str(ex)[:80]}): centred crop")
+    v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr, track=track,
                      punch=punch, fps=a.fps, bg=a.bg, bg_color=a.bg_color)
     af = ("highpass=f=80,afftdn=nr=12:nf=-30," if a.clean_audio else "") + "loudnorm=I=-14:TP=-1.5:LRA=11"
     mp4 = out / f"clip_{a.pick}.mp4"
@@ -477,7 +471,7 @@ def main():
                                             "platform": a.platform, "width": W, "height": H,
                                             "bg": a.bg, "bg_color": hex_color(a.bg_color), "context": context,
                                             "outro_handle": a.outro_handle, "bg_color_name": a.bg_color,
-                                            "context_on": bool(a.context.strip()), "hook": a.hook or a.title, "title": a.title, "cam": cam,
+                                            "context_on": bool(a.context.strip()), "card_theme": a.card_theme, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)
