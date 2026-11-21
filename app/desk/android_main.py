@@ -41,26 +41,39 @@ def _link_tools(native_dir, bin_dir):
 
 
 def _unpack_ffmpeg_libs(native_dir, home):
-    """Unpack ffmpeg's shared libraries once per app version (stamp = size + mtime of the zip)."""
-    z = Path(native_dir) / "libffmpeg.zip.so"
-    if not z.exists():
+    """Unpack ffmpeg's shared libraries once per app version (stamp = sizes + mtimes of the zips).
+    libffmpeg.zip.so holds libav*, x264, libass...; libffdeps.zip.so holds the few runtime libraries they share
+    with youtubedl-android's Python package (libc++_shared, libcrypto, libexpat, libandroid-support...)."""
+    zips = [z for z in (Path(native_dir) / "libffmpeg.zip.so", Path(native_dir) / "libffdeps.zip.so") if z.exists()]
+    if not zips:
         return None
     dest = home / "ffmpeg-pkg"
     stamp = dest / ".stamp"
-    want = f"{z.stat().st_size}-{int(z.stat().st_mtime)}"
+    want = "v3-" + "-".join(f"{z.name}:{z.stat().st_size}:{int(z.stat().st_mtime)}" for z in zips)
     if not (stamp.exists() and stamp.read_text() == want):
-        import shutil
+        import shutil, stat
         shutil.rmtree(dest, ignore_errors=True)
         dest.mkdir(parents=True)
-        with zipfile.ZipFile(z) as zf:
-            for m in zf.infolist():  # libraries only; skip headers/static archives to save space
-                if m.is_dir() or not (m.filename.startswith("usr/lib/") and ".so" in m.filename):
-                    continue
-                if "/" in m.filename[len("usr/lib/"):]:
-                    continue
-                zf.extract(m, dest)
+        for z in zips:
+            _extract_libs(z, dest, stat)
         stamp.write_text(want)
     return dest / "usr" / "lib"
+
+
+def _extract_libs(z, dest, stat):
+    """Extract usr/lib/*.so* from z into dest, recreating symlinks (zipfile alone writes them as tiny text files)."""
+    with zipfile.ZipFile(z) as zf:
+        for m in zf.infolist():  # libraries only; skip headers/static archives to save space
+            if m.is_dir() or not (m.filename.startswith("usr/lib/") and ".so" in m.filename):
+                continue
+            target = dest / m.filename
+            if target.exists() or target.is_symlink():
+                continue
+            if stat.S_ISLNK(m.external_attr >> 16):  # e.g. libavdevice.so.61 -> libavdevice.so.61.3.100
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.symlink(zf.read(m).decode(), target)
+            else:
+                zf.extract(m, dest)
 
 
 def _fontconfig(home):

@@ -220,6 +220,34 @@ jobs:
           file $L/*.so
           for f in libffmpeg.so libffprobe.so libqjs.so; do file $L/$f | grep -q "linker64" || { echo "$f is not an Android executable"; exit 1; }; done
           unzip -l $L/libffmpeg.zip.so | grep -q "usr/lib/libass.so" || { echo "ffmpeg libs missing libass"; exit 1; }
+          # runtime libs ffmpeg shares with youtubedl-android's Python package (libc++_shared, libcrypto, libexpat...)
+          unzip -o -j aar/library.aar "jni/arm64-v8a/libpython.zip.so" -d aar
+          mkdir -p aar/deps && unzip -q aar/libpython.zip.so 'usr/lib/libandroid-posix-semaphore*' 'usr/lib/libandroid-support*' \
+            'usr/lib/libc++_shared*' 'usr/lib/libcrypto*' 'usr/lib/libexpat*' -d aar/deps
+          (cd aar/deps && zip -q -y -r "$GITHUB_WORKSPACE/$L/libffdeps.zip.so" usr)
+          # every library ffmpeg/ffprobe load must be in the zips (or be an Android system library)
+          python3 - "$L" <<'PY'
+          import subprocess, sys
+          from pathlib import Path
+          L = Path(sys.argv[1])
+          import tempfile; tmp = Path(tempfile.mkdtemp())
+          for z in ("libffmpeg.zip.so", "libffdeps.zip.so"):  # unzip keeps symlinks (zipfile does not)
+              subprocess.run(["unzip", "-q", "-o", str(L / z), "-d", str(tmp)], check=True)
+          def needed(f):
+              out = subprocess.run(["readelf", "-d", str(f)], capture_output=True, text=True).stdout
+              return [x.split("[")[1].rstrip("]") for x in out.splitlines() if "NEEDED" in x]
+          system = {"libc.so", "libm.so", "libdl.so", "liblog.so", "libz.so"}
+          for exe in ("libffmpeg.so", "libffprobe.so"):
+              seen, todo, missing = set(), needed(L / exe), set()
+              while todo:
+                  n = todo.pop()
+                  if n in seen: continue
+                  seen.add(n); f = tmp / "usr/lib" / n
+                  if f.exists(): todo += needed(f.resolve())
+                  elif n not in system: missing.add(n)
+              print(exe, len(seen), "libs, unresolved:", sorted(missing))
+              if missing: sys.exit(f"{exe} would fail to start: missing {sorted(missing)}")
+          PY
 
       - name: Build APK
         working-directory: android
@@ -229,7 +257,7 @@ jobs:
         run: |
           APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
           unzip -l "$APK" | grep -E "lib/arm64-v8a/lib(ffmpeg|ffprobe|qjs).so|bundle/scripts/moments.py|bundle/ui/index.html"
-          for f in libffmpeg.so libffprobe.so libffmpeg.zip.so libqjs.so; do unzip -l "$APK" | grep -q "lib/arm64-v8a/$f" || { echo "missing $f"; exit 1; }; done
+          for f in libffmpeg.so libffprobe.so libffmpeg.zip.so libffdeps.zip.so libqjs.so; do unzip -l "$APK" | grep -q "lib/arm64-v8a/$f" || { echo "missing $f"; exit 1; }; done
           mkdir -p out && cp "$APK" out/ViceDesk.apk && ls -la out
 
       - uses: actions/upload-artifact@v4

@@ -223,7 +223,10 @@ async function loadStatus() {
     const b = $("#setupBanner");
     if (!s.tools.ffmpeg.ok || !s.tools.ffprobe.ok) {
       b.hidden = false;
-      b.innerHTML = s.platform === "win32"
+      const why = esc((s.tools.ffmpeg.ok ? s.tools.ffprobe.path : s.tools.ffmpeg.path) || "");
+      b.innerHTML = s.android
+        ? `<span><b>The video engine can't start on this phone.</b> Please send a screenshot of the Setup card below to the developer.<br><span class="small mono">${why}</span></span>`
+        : s.platform === "win32"
         ? `<span><b>ffmpeg is needed</b> to cut clips. One click downloads it (about 100 MB); you'll see the download speed live.</span><button class="primary" id="instFF">Install ffmpeg</button>`
         : `<span><b>ffmpeg is missing.</b> Install it with your package manager (<code>sudo apt install ffmpeg</code> / <code>brew install ffmpeg</code>), then restart.</span>`;
       const btn = $("#instFF"); if (btn) btn.onclick = () => run("install_ffmpeg", {});
