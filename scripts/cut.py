@@ -353,11 +353,14 @@ def main():
                      punch=punch, fps=a.fps)
     af = ("highpass=f=80,afftdn=nr=12:nf=-30," if a.clean_audio else "") + "loudnorm=I=-14:TP=-1.5:LRA=11"
     mp4 = out / f"clip_{a.pick}.mp4"
+    part = out / f"clip_{a.pick}.part.mp4"  # renamed to clip_N.mp4 only when the encode completes
+    (out / f"clip_{a.pick}.json").unlink(missing_ok=True)  # stale settings must not vouch for a half-made clip
     stage(2, 2, f"Encoding clip {a.pick}")
     run_ffmpeg([tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
          "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", af,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-         "-ar", "48000", "-movflags", "+faststart", str(mp4)], e0 - s0)
+         "-ar", "48000", "-movflags", "+faststart", str(part)], e0 - s0)
+    part.replace(mp4)
     if cap_words or a.hook:
         export_subs(caption_groups(cap_words, s0, e0, a.allow_profanity), s0, a.hook, out / f"clip_{a.pick}")
     info = c.get("info", {})

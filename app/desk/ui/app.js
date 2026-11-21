@@ -140,12 +140,20 @@ function taskCard(t, opts = {}) {
       <div><span>ETA</span><br>${live && d.eta != null ? fmtDur(d.eta) : "–"}</div><div><span>Source</span><br>${esc(d.source || "")}</div>
       <svg data-spark="${t.id}"></svg></div>` : ""}
     ${t.error ? `<div class="err">${esc(t.error)}</div>` : ""}
+    ${["failed", "cancelled"].includes(t.state) ? `<div class="res"><button class="sm primary" data-retry="${t.id}">↻ Retry</button><span class="muted small">continues from where it stopped</span></div>` : ""}
     ${live && t.last && !opts.noLast ? `<div class="last">${esc(t.last)}</div>` : ""}
     ${res}</div>`;
 }
 function paintSparks(root) { $$("svg[data-spark]", root).forEach((s) => { const t = S.tasks.find((x) => x.id === s.dataset.spark); if (t) spark(s, t.speed_hist || [], 200, 26); }); }
 
 document.addEventListener("click", async (e) => {
+  const rt = e.target.closest("[data-retry]");
+  if (rt) {
+    e.stopPropagation(); rt.disabled = true;
+    try { await api(`/api/tasks/${rt.dataset.retry}/retry`, {}); toast("Retrying. Finished steps are reused.", 2500); }
+    catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`); rt.disabled = false; }
+    return;
+  }
   const c = e.target.closest("[data-cancel]");
   if (c) { e.stopPropagation(); await api(`/api/tasks/${c.dataset.cancel}/cancel`, {}).catch((er) => toast(esc(er.message))); return; }
   const sj = e.target.closest("[data-showjob]");

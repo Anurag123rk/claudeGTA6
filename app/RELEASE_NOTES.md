@@ -8,6 +8,7 @@
 | **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.4.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
 
 ### Fixed in 2.0.4
+- **Retry button.** Every failed or stopped task gets **↻ Retry**, which runs it again with the same settings and continues from where it stopped: a finished download is reused, a partial one resumes, the transcript and moments are kept, and clips already cut with the same settings are skipped. Clips are now written under a temporary name, so a stopped encode can never pass for a finished clip.
 - **Downloads keep going when you switch apps (Android).** While a task runs, Vice Desk shows a progress notification and keeps the CPU and Wi-Fi awake, so Android no longer freezes the download. The keep-alive is released when the last task finishes. Allow notifications when asked to see the progress; the work continues either way.
 - **A cut-off download is never reused.** Videos download to a temporary file and only become `source.mp4` once they are complete and readable. A damaged leftover from an earlier run is detected and downloaded again, which fixes "Invalid data found when processing input". Network drops are retried up to 3 times and resume where they stopped, and audio extraction is crash-safe too.
 - Reading video info is retried when the network is briefly unavailable ("Failed to resolve www.youtube.com").

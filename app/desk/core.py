@@ -376,6 +376,18 @@ class TaskManager:
             kill_tree(t.proc)
         return True
 
+    def retry(self, tid):
+        """Start a failed/stopped task again with the same settings. Finished steps are reused: a complete
+        download, the transcript and moments are kept, partial downloads resume, and clips already cut with the
+        same settings are skipped."""
+        t = self.get(tid)
+        if not t or t.state not in ("failed", "cancelled") or t.kind not in RUNNERS:
+            return None
+        p = {k: v for k, v in t.params.items() if not k.startswith("_")}
+        p["_resume"] = True
+        title = t.title if t.title.startswith("Retry: ") else "Retry: " + t.title
+        return self.start(t.kind, title, p, RUNNERS[t.kind](p))
+
     def cancel_all(self):
         for t in self.list():
             if t.state == "running":
@@ -709,6 +721,23 @@ def runner_check(p):
     return r
 
 
+def _clip_done(job, n, p):
+    """True if clip n exists, is not empty, and was cut with the same layout/platform/effects as p."""
+    mp4 = Path(job) / "edits" / f"clip_{n}.mp4"
+    meta = mp4.with_suffix(".json")
+    if not (mp4.exists() and mp4.stat().st_size > 10000 and meta.exists()):
+        return False
+    try:
+        m = json.loads(meta.read_text(encoding="utf-8"))
+    except ValueError:
+        return False
+    want = {"layout": p.get("layout") or "blur", "platform": p.get("platform") or "vertical",
+            "punch": 0.15 if p.get("punch") else 0, "clean_audio": bool(p.get("clean_audio")),
+            "fps": 60 if p.get("fps60") else 30, "hook": p.get("hook") or ""}
+    return all(m.get(k, want[k]) == v for k, v in want.items() if k != "layout") and \
+        (m.get("layout") == want["layout"] or want["layout"] in ("facecam", "react"))  # facecam may fall back to blur
+
+
 def runner_pipeline(p):
     """Full pipeline: find moments -> cut the N best -> rule-check each."""
     def r(t):
@@ -729,13 +758,16 @@ def runner_pipeline(p):
         t.result = {"job": job, "clips": clips, "checks": checks}
         for k, c in enumerate(best):
             t.step = f"Cut clip {k + 1} of {len(best)} (moment #{c['n']})"
-            try:
-                run_script(t, "cut.py", _cut_args(job, c["n"], p), weight_i=1 + 2 * k)
-            except Cancelled:
-                raise
-            except RuntimeError as e:  # one bad moment (e.g. no facecam) should not kill the batch
-                t.add_log(f"skipped moment #{c['n']}: {e}")
-                continue
+            if p.get("_resume") and _clip_done(job, c["n"], p):
+                t.add_log(f"clip {c['n']} already cut with these settings: kept")
+            else:
+                try:
+                    run_script(t, "cut.py", _cut_args(job, c["n"], p), weight_i=1 + 2 * k)
+                except Cancelled:
+                    raise
+                except RuntimeError as e:  # one bad moment (e.g. no facecam) should not kill the batch
+                    t.add_log(f"skipped moment #{c['n']}: {e}")
+                    continue
             clip = str(Path(job) / "edits" / f"clip_{c['n']}.mp4")
             clips.append(clip)
             t.step = f"Rule check {k + 1} of {len(best)}"
@@ -894,6 +926,8 @@ def list_jobs():
         except Exception:
             pass
         for f in sorted((d / "edits").glob("clip_*.mp4")) if (d / "edits").exists() else []:
+            if f.name.endswith(".part.mp4"):  # an encode that was stopped half-way
+                continue
             meta = {}
             try:
                 meta = json.loads(f.with_suffix(".json").read_text(encoding="utf-8"))

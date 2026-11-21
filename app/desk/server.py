@@ -206,6 +206,9 @@ class Handler(BaseHTTPRequestHandler):
                      "install_model": "Download speech model: " + str(p.get("model", ""))}[kind]
             t = TASKS.start(kind, title, p, core.RUNNERS[kind](p))
             return self._json({"id": t.id})
+        if path.startswith("/api/tasks/") and path.endswith("/retry"):
+            t = TASKS.retry(path.split("/")[3])
+            return self._json({"id": t.id}) if t else self._err(400, "only failed or stopped tasks can be retried")
         if path.startswith("/api/tasks/") and path.endswith("/cancel"):
             return self._json({"ok": TASKS.cancel(path.split("/")[3])})
         if path == "/api/tasks/clear":
