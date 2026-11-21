@@ -197,6 +197,57 @@
         </ol>
         <p class="muted small">Runs on a computer in <b>Claude Code</b>, with your own ElevenLabs, Apify and YouTube Data API accounts (their usage is billed by them). Vice Desk sets up the project; Claude Code does the work.</p>
       </div>
+      <div class="card" id="aiCard">
+        <h2>AI model</h2>
+        <p class="muted small">Pick who writes, critiques and judges. Tap <b>Get API key</b> to sign in to the provider and create a key, then paste it here. Keys stay on this device and go only to that provider. Consumer subscriptions (ChatGPT Plus, Claude Pro) can't be used by other apps; these providers only allow API keys, billed per use.</p>
+        <div class="provs" id="aiProviders"></div>
+        <div class="row">
+          <label class="grow">API key<input id="aiKey" type="password" autocomplete="off" placeholder="paste your key"></label>
+          <button type="button" id="aiGetKey">Get API key</button>
+        </div>
+        <label id="aiBaseRow" hidden>Server address (OpenAI-compatible)<input id="aiBase" placeholder="http://192.168.1.20:11434/v1"></label>
+        <div class="row">
+          <label class="grow">Model<select id="aiModel"></select></label>
+          <button type="button" id="aiLoad">Load models</button>
+        </div>
+        <div class="row end"><span class="muted small" id="aiState"></span><button type="button" id="aiTest">Test</button><button type="button" class="primary" id="aiSave">Save</button></div>
+        <details class="small"><summary>Voice: ElevenLabs (optional)</summary>
+          <p class="muted small">With an ElevenLabs key the guide is voiced by a professional voice. Without one, the desktop app uses a free Microsoft voice.</p>
+          <div class="row"><label class="grow">ElevenLabs API key<input id="elKey" type="password" autocomplete="off" placeholder="paste your key"></label>
+            <button type="button" id="elGetKey">Get key</button></div>
+          <label>Voice ID (optional; blank = first voice on your account)<input id="elVoice" placeholder="e.g. a voice ID from your ElevenLabs voice library"></label>
+          <div class="row end"><button type="button" id="elSave">Save voice settings</button></div>
+        </details>
+      </div>
+      <div class="card">
+        <h2>Make a guide here</h2>
+        <p class="muted small">Runs on this phone or PC with your AI model. In order:</p>
+        <ol class="small">
+          <li>Finds what's winning in the niche</li>
+          <li>Picks a concept</li>
+          <li>Writes and fact-tags the script</li>
+          <li>Runs three blind critics and a judge, then revises</li>
+          <li>Voices it</li>
+          <li>Builds a 1080p rough cut from official footage, with chapter cards and captions</li>
+          <li>Writes the title, description with chapters, and thumbnail</li>
+        </ol>
+        <p class="muted small">For the full studio quality (component library, multi-round critics, YouTube upload), use the Claude Code project below.</p>
+        <form id="lfRun" class="stack">
+          <div class="row">
+            <label class="grow">Topic (optional)<input name="topic" placeholder="e.g. every hidden beach in Leonida"></label>
+            <label>Idea from<select name="idea"><option value="outliers">What's winning now</option><option value="own">Its own concept</option></select></label>
+          </div>
+          <div class="row">
+            <label>Length (min)<input name="minutes" type="number" min="2" max="20" value="8"></label>
+            <label>Voice<select name="voice"><option value="auto">ElevenLabs if set, else free</option><option value="elevenlabs">ElevenLabs</option><option value="free">Free voice (desktop)</option><option value="none">No voice</option></select></label>
+          </div>
+          <label>Official footage URLs (optional, one per line; blank = Rockstar Games' own trailers)<textarea name="footage" rows="2" class="mono"></textarea></label>
+          <div class="row studio"><label class="chk"><span><input type="checkbox" name="fresh"> Start a new guide (otherwise resume the last one)</span></label></div>
+          <div class="row end"><button class="primary" type="submit">Make the guide</button></div>
+        </form>
+        <div id="lfTask" class="tasks"></div>
+      </div>
+      <h2 style="margin:22px 0 10px">Full studio in Claude Code</h2>
       <div class="card">
         <form id="lfForm" class="stack">
           <div class="row">

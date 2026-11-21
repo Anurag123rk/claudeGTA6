@@ -4,3 +4,4 @@ truststore>=0.9
 pywebview>=5.3; sys_platform == "win32" or sys_platform == "darwin"
 pyinstaller>=6.11
 deno>=2.9.8  # JavaScript runtime yt-dlp needs for YouTube; copied next to ffmpeg in the .exe
+anthropic>=2.0  # Claude for the long-form workflow (official SDK)

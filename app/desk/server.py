@@ -153,6 +153,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/tasks/"):
             t = TASKS.get(path.rsplit("/", 1)[-1])
             return self._json(t.summary(full=True)) if t else self._err(404, "no such task")
+        if path == "/api/ai":
+            from desk import ai
+            return self._json(ai.public())
         if path == "/api/jobs":
             return self._json({"jobs": core.list_jobs()})
         if path == "/api/file":
@@ -203,7 +206,8 @@ class Handler(BaseHTTPRequestHandler):
                      "cut": f"Cut clip {p.get('pick')}: " + Path(p.get("job", "")).name,
                      "check": "Rule check: " + Path(p.get("clip", "")).name, "live": "Live: " + p.get("url", ""),
                      "install_ffmpeg": "Install ffmpeg",
-                     "install_model": "Download speech model: " + str(p.get("model", ""))}[kind]
+                     "install_model": "Download speech model: " + str(p.get("model", "")),
+                     "longform": "Long-form guide: " + (p.get("topic") or p.get("channel") or "GTA 6")}[kind]
             t = TASKS.start(kind, title, p, core.RUNNERS[kind](p))
             return self._json({"id": t.id})
         if path.startswith("/api/tasks/") and path.endswith("/retry"):
@@ -233,6 +237,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, "not a web link")
             webbrowser.open(url)
             return self._json({"ok": True})
+        if path.startswith("/api/ai"):
+            from desk import ai
+            try:
+                if path == "/api/ai":
+                    return self._json(ai.update(**{k: b.get(k) for k in ("provider", "key", "model", "base_url", "eleven_key", "voice_id")}))
+                if path == "/api/ai/forget":
+                    return self._json(ai.forget(b.get("what") or ""))
+                if path == "/api/ai/models":
+                    return self._json({"models": ai.list_models(b.get("provider"), b.get("key"), b.get("base_url"))})
+                if path == "/api/ai/test":
+                    text, usage = ai.generate("Reply with exactly: OK", "Say OK.", max_tokens=200, effort="low")
+                    return self._json({"ok": True, "reply": text.strip()[:80], "model": usage.get("model")})
+            except ai.AIError as e:
+                return self._err(400, str(e))
+            except Exception as e:  # network errors and the like: show them, don't crash the server thread
+                return self._err(400, f"{type(e).__name__}: {str(e)[:200]}")
         if path == "/api/longform/create":
             from desk import longform
             r = longform.create_project(core.SETTINGS.workspace, b.get("channel"), b.get("topics"))

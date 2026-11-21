@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -151,6 +151,7 @@ def child_env(extra=None):
     env["PYTHONIOENCODING"] = "utf-8"
     env["CLIP_DESK_HOME"] = str(SETTINGS.workspace)
     env["WHISPER_MODEL"] = whisper_model_ref(SETTINGS.data.get("whisper_model") or "base")
+    env["VICE_AI_CONFIG"] = str(config_dir() / "ai.json")  # the long-form runner reads the chosen AI model here
     if cookies_file().exists():
         env["VICE_COOKIES"] = str(cookies_file())
     if SETTINGS.data.get("cookies_browser"):
@@ -269,7 +270,8 @@ STAGE = re.compile(r"^\[STAGE\]\s+(\d+)/(\d+)\s+(.*)$")
 PROG = re.compile(r"^\[PROG\]\s+([\d.]+)\|([\d.]+)\|(.*)$")
 VPROG = re.compile(r"\[VPROG\]\s+(\S+)\|(\S+)\|(\S+)\|(\S+)\|(\S+)\|(\S*)")
 # weights of the [STAGE] numbers inside a script, for the overall bar
-STAGE_WEIGHTS = {"moments.py": [0.03, 0.45, 0.04, 0.43, 0.05], "cut.py": [0.12, 0.88]}
+STAGE_WEIGHTS = {"moments.py": [0.03, 0.45, 0.04, 0.43, 0.05], "cut.py": [0.12, 0.88],
+                 "lf_run.py": [0.06, 0.04, 0.12, 0.18, 0.12, 0.18, 0.27, 0.03]}
 
 
 def _num(s):
@@ -946,9 +948,32 @@ def runner_install_model(p):
     return r
 
 
+def runner_longform(p):
+    """In-app long-form guide with the chosen AI model (scripts/lf_run.py)."""
+    def r(t):
+        from desk import longform
+        proj = longform.create_project(SETTINGS.workspace, p.get("channel"), p.get("topics"))
+        t.step = "Long-form guide"
+        args = ["--project", proj["path"], "--idea", p.get("idea") or "outliers", "--minutes", p.get("minutes") or 8,
+                "--voice", p.get("voice") or "auto"]
+        if p.get("topics"):
+            args += ["--topics", p["topics"]]
+        if p.get("topic"):
+            args += ["--topic", p["topic"]]
+        if p.get("footage"):
+            args += ["--footage", p["footage"]]
+        if p.get("fresh"):
+            args += ["--fresh"]
+        run_script(t, "lf_run.py", args)
+        draft = next((ln.split("draft: ", 1)[1] for ln in t.log if ln.startswith("draft: ")), "")
+        pack = next((ln.split("publish pack: ", 1)[1] for ln in t.log if ln.startswith("publish pack: ")), "")
+        t.result = {"draft": draft, "publish": pack, "project": proj["path"]}
+    return r
+
+
 RUNNERS = {"trends": runner_trends, "streams": runner_streams, "moments": runner_moments, "cut": runner_cut,
            "check": runner_check, "pipeline": runner_pipeline, "live": runner_live, "install_ffmpeg": runner_install_ffmpeg,
-           "install_model": runner_install_model}
+           "install_model": runner_install_model, "longform": runner_longform}
 
 
 # ---------------------------------------------------------------- library

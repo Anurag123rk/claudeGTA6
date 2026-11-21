@@ -1,11 +1,29 @@
-## Vice Desk 2.1.0: Windows, macOS, Linux and Android
+## Vice Desk 2.2.0: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.1.0-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.1.0-linux-x86_64` | `chmod +x ViceDesk-2.1.0-linux-x86_64 && ./ViceDesk-2.1.0-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.1.0.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.0-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.0-linux-x86_64` | `chmod +x ViceDesk-2.2.0-linux-x86_64 && ./ViceDesk-2.2.0-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.0.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### New in 2.2.0
+- **Pick your AI for long-form guides: Claude, ChatGPT, Gemini, OpenRouter, or a local model** (any OpenAI-compatible server, such as Ollama on your PC). Open **Long-form → AI model**, choose a provider, then:
+  1. Tap **Get API key** to sign in to that provider and create a key.
+  2. Paste the key, tap **Load models**, pick a model and tap **Test**.
+
+  Keys stay on your device and are only sent to that provider. ChatGPT Plus and Claude Pro subscriptions can't be used by other apps; these providers only allow API keys, which are billed per use.
+- **Make a long-form guide right in the app, on phone or PC.** With your chosen model, Vice Desk:
+  1. finds the outliers in the niche (views ÷ the channel's usual views, one video per channel)
+  2. picks the strongest concept, or invents its own
+  3. writes a chaptered script with every claim tagged official, measured, in-game or unverified (only official or measured claims are stated as fact)
+  4. runs three blind critics (story, honesty, pacing) and a judge, then revises
+  5. voices it (ElevenLabs with your key, otherwise a free voice on desktop)
+  6. builds a 1080p rough cut from official footage only (your URLs or Rockstar Games' own trailers), with GTA VI chapter cards and captions, mastered to −14 LUFS
+  7. writes the title, a description with chapter timestamps and sources, and a thumbnail
+
+  Every stage is saved, so **Retry** continues without paying for finished AI steps again. For the full studio (component library, multi-round critics, YouTube upload), the Claude Code project is still on the same page.
+- Claude defaults to Claude Opus 5.5. A request Claude's safety filter declines is retried automatically on Anthropic's recommended fallback model.
 
 ### New in 2.1.0
 - **Fix for "Sign in to confirm you're not a bot".** YouTube blocks anonymous downloads from many connections, mobile data especially. The fix is a signed-in session's cookies. Open **Settings → YouTube sign-in**:

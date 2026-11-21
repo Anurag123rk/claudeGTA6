@@ -51,7 +51,7 @@ def _no_console_windows():
 def _bundled_deps():  # never called: lists imports so PyInstaller bundles what the scripts need
     import concurrent.futures, csv, ctypes, hashlib, socket, ssl, urllib.request, wave  # noqa: F401
     import numpy, requests, cv2, faster_whisper, ctranslate2, deep_translator, edge_tts, yt_dlp  # noqa: F401
-    import truststore  # noqa: F401
+    import truststore, anthropic  # noqa: F401
 
 
 def main():

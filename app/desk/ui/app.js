@@ -33,6 +33,7 @@ function go(page) {
   $$(".page").forEach((p) => p.classList.toggle("on", p.id === "page-" + page));
   if (page === "library") loadJobs();
   if (page === "settings") loadSettings();
+  if (page === "longform") loadAI();
   if (page === "monitor") renderMonitor();
   try { localStorage.setItem("vd-page", page); } catch (e) { /* storage may be blocked */ }
 }
@@ -126,6 +127,8 @@ function taskCard(t, opts = {}) {
     (r.clips || []).forEach((c) => b.push(`<button class="sm" data-play="${esc(c)}" data-name="${esc(c.split(/[\\/]/).pop())}">▶ ${esc(c.split(/[\\/]/).pop())}</button>`));
     (r.checks || []).forEach((c) => b.push(`<span class="badge ${c.pass ? "done" : "failed"}" title="${esc((c.lines || []).join("\n"))}">${c.pass ? "PASS" : "FAIL"} ${esc(c.clip.split(/[\\/]/).pop())}</span>`));
     if (r.file) b.push(`<button class="sm" data-showfind="${t.kind}">Show results</button>`);
+    if (r.draft) b.push(`<button class="sm primary" data-play="${esc(r.draft)}" data-name="Draft">▶ Watch the draft</button>`, AND
+      ? `<button class="sm" data-share="${esc(r.draft)}">Share</button>` : `<button class="sm" data-open="${esc(r.publish || r.project)}">Open publish pack</button>`);
     res = b.length ? `<div class="res">${b.join("")}</div>` : "";
   }
   return `<div class="task ${S.selTask === t.id ? "sel" : ""}" data-task="${t.id}">
@@ -237,7 +240,7 @@ async function loadStatus() {
     renderModelCards(s); fillModelSelect(s);
     const modelBusy = S.tasks.some((x) => x.kind === "install_model" && x.state === "running");
     if (!s.settings.mode) { $("#modePick").hidden = false; }  // first start: clips or long-form
-    else if (s.first_run || modelBusy) $("#firstRun").hidden = false;
+    else if (modelBusy || (s.first_run && s.settings.mode !== "longform")) $("#firstRun").hidden = false;  // captions model: clips only
     const b = $("#setupBanner");
     if (!s.tools.ffmpeg.ok || !s.tools.ffprobe.ok) {
       b.hidden = false;
@@ -507,6 +510,70 @@ $("#lfCopy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(t.value); }
   catch (er) { t.select(); document.execCommand("copy"); }
   toast("Prompt copied. Paste it into Claude Code.");
+});
+
+// ---------------------------------------------------------------- AI model (long-form)
+const AI = { cfg: null, sel: "claude" };
+async function loadAI() {
+  try { AI.cfg = await api("/api/ai"); AI.sel = AI.cfg.provider; renderAI(); } catch (e) { /* engine not ready */ }
+}
+function renderAI() {
+  const c = AI.cfg; if (!c) return;
+  $("#aiProviders").innerHTML = Object.entries(c.providers).map(([k, v]) =>
+    `<button type="button" class="${k === AI.sel ? "on" : ""}" data-prov="${k}">${esc(v.label)}<small>${c.has_key[k] ? "✓ key saved" : (k === "custom" ? "no key needed" : "no key yet")}${k === c.provider ? " · in use" : ""}</small></button>`).join("");
+  $("#aiBaseRow").hidden = AI.sel !== "custom"; $("#aiBase").value = c.base_url || "";
+  $("#aiGetKey").hidden = !c.providers[AI.sel].key_url;
+  $("#aiKey").value = ""; $("#aiKey").placeholder = c.has_key[AI.sel] ? "saved (paste to replace)" : "paste your key";
+  const models = c.providers[AI.sel].models || [];
+  const cur = AI.sel === c.provider ? c.model : "";
+  const opts = [...new Set([cur, ...models].filter(Boolean))];
+  $("#aiModel").innerHTML = opts.length ? opts.map((m) => `<option>${esc(m)}</option>`).join("") : `<option value="">Load models first</option>`;
+  if (cur) $("#aiModel").value = cur;
+  $("#aiState").innerHTML = c.has_key[c.provider] || c.provider === "custom"
+    ? `<span class="ok">In use: ${esc(c.providers[c.provider].label)} · ${esc(c.model || "choose a model")}</span>` : `<span class="warn">No model set up yet</span>`;
+  $("#elKey").placeholder = c.has_eleven ? "saved (paste to replace)" : "paste your key"; $("#elVoice").value = c.voice_id || "";
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-prov]"); if (!b) return;
+  AI.sel = b.dataset.prov; renderAI();
+});
+const openExt = (url) => { if (AND) AND.openUrl(url); else api("/api/open-url", { url }).catch((er) => toast(esc(er.message))); };
+$("#aiGetKey").addEventListener("click", () => openExt(AI.cfg.providers[AI.sel].key_url));
+$("#elGetKey").addEventListener("click", () => openExt(AI.cfg.eleven_key_url));
+$("#aiLoad").addEventListener("click", async () => {
+  const btn = $("#aiLoad"); btn.disabled = true; btn.textContent = "Loading…";
+  try {
+    const r = await api("/api/ai/models", { provider: AI.sel, key: $("#aiKey").value, base_url: $("#aiBase").value }, 40000);
+    const pref = AI.cfg.providers[AI.sel].models || [];
+    const list = [...pref.filter((m) => r.models.includes(m)), ...r.models.filter((m) => !pref.includes(m))];
+    $("#aiModel").innerHTML = list.map((m) => `<option>${esc(m)}</option>`).join("");
+    toast(`${r.models.length} models available.`);
+  } catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`, 7000); }
+  btn.disabled = false; btn.textContent = "Load models";
+});
+$("#aiSave").addEventListener("click", async () => {
+  try {
+    AI.cfg = await api("/api/ai", { provider: AI.sel, key: $("#aiKey").value, model: $("#aiModel").value, base_url: $("#aiBase").value });
+    renderAI(); toast("AI model saved.");
+  } catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`); }
+});
+$("#aiTest").addEventListener("click", async () => {
+  const btn = $("#aiTest"); btn.disabled = true; btn.textContent = "Testing…";
+  try {
+    if ($("#aiKey").value || AI.sel !== AI.cfg.provider) AI.cfg = await api("/api/ai", { provider: AI.sel, key: $("#aiKey").value, model: $("#aiModel").value, base_url: $("#aiBase").value });
+    const r = await api("/api/ai/test", {}, 90000); renderAI(); toast(`<span class="ok">Works:</span> ${esc(r.model || "")} replied "${esc(r.reply)}"`);
+  } catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`, 8000); }
+  btn.disabled = false; btn.textContent = "Test";
+});
+$("#elSave").addEventListener("click", async () => {
+  try { AI.cfg = await api("/api/ai", { eleven_key: $("#elKey").value, voice_id: $("#elVoice").value }); renderAI(); toast("Voice settings saved."); }
+  catch (er) { toast(`<span class="bad">${esc(er.message)}</span>`); }
+});
+$("#lfRun").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const d = formData(e.target); d.channel = $("#lfForm [name=channel]").value || (S.status && S.status.settings.longform_channel) || "";
+  d.footage = (d.footage || "").split(/\s+/).filter(Boolean).join(",");
+  run("longform", d, "lfTask");
 });
 
 // ---------------------------------------------------------------- settings
