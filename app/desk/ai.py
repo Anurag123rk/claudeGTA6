@@ -272,15 +272,53 @@ def _openai_compatible(cfg, prov, model, system, prompt):
     return text, {"input": u.get("prompt_tokens"), "output": u.get("completion_tokens"), "model": model}
 
 
+def _repair(t):
+    """Fix the JSON slips models make: smart quotes, // comments, trailing commas, Python literals."""
+    t = t.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+    t = re.sub(r"(?m)^\s*//.*$", "", t)
+    t = re.sub(r",\s*([}\]])", r"\1", t)
+    t = re.sub(r"\bTrue\b", "true", re.sub(r"\bFalse\b", "false", re.sub(r"\bNone\b", "null", t)))
+    return t
+
+
+def extract_json(text):
+    """The JSON object/array in a model reply, or None. Handles <think> blocks (Qwen, DeepSeek...), code fences,
+    prose around the JSON and common syntax slips."""
+    t = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S | re.I)
+    t = re.sub(r"^.*?</think>", "", t, flags=re.S | re.I)  # a reasoning block whose opening tag was cut
+    bodies = re.findall(r"```(?:json)?\s*(.+?)```", t, re.S) + [t]
+    dec = json.JSONDecoder()
+    best = None
+    for body in bodies:
+        for variant in (body, _repair(body)):
+            starts = [i for i, ch in enumerate(variant) if ch in "{["][:80]
+            for i in starts:
+                try:
+                    obj, _ = dec.raw_decode(variant[i:])
+                except ValueError:
+                    continue
+                if isinstance(obj, (dict, list)) and obj:
+                    size = len(json.dumps(obj))
+                    if best is None or size > best[0]:
+                        best = (size, obj)  # the largest object is the answer, not an example inside the prose
+    return best[1] if best else None
+
+
 def generate_json(system, prompt, **kw):
-    """generate() and parse the first JSON object/array in the reply (models sometimes wrap it in prose or fences)."""
-    text, usage = generate(system + "\nReply with valid JSON only, no commentary.", prompt, **kw)
-    m = re.search(r"```(?:json)?\s*(.+?)```", text, re.S)
-    body = m.group(1) if m else text
-    starts = [i for i in (body.find("{"), body.find("[")) if i >= 0]
-    if not starts:
-        raise AIError("the model did not return JSON")
-    try:
-        return json.JSONDecoder().raw_decode(body[min(starts):])[0], usage
-    except ValueError:
-        raise AIError("could not parse the model's JSON reply")
+    """generate() and parse the JSON in the reply. If the model's reply cannot be read as JSON, ask it once to
+    reformat its own answer (reasoning models often wrap or slightly break it)."""
+    text, usage = generate(system + "\nReply with valid JSON only: no commentary, no markdown, no comments.", prompt, **kw)
+    obj = extract_json(text)
+    if obj is not None:
+        return obj, usage
+    fixed, u2 = generate("You convert text into valid JSON. Output only the JSON.",
+                         "Rewrite the answer below as valid JSON with the same content and keys. "
+                         "No commentary.\n\n" + (text or "")[-12000:], max_tokens=16000, effort="low")
+    obj = extract_json(fixed)
+    for k in ("input", "output"):
+        usage[k] = (usage.get(k) or 0) + (u2.get(k) or 0)
+    if obj is not None:
+        return obj, usage
+    snippet = " ".join((text or "").split())[:160]
+    raise AIError("the model did not return usable JSON (it began: \"" + snippet + "\"). "
+                  "Press Retry, or pick a stronger model in AI model.")

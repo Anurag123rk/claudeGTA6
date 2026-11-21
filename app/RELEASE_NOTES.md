@@ -1,11 +1,14 @@
-## Vice Desk 2.2.2: Windows, macOS, Linux and Android
+## Vice Desk 2.2.3: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.2-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.2-linux-x86_64` | `chmod +x ViceDesk-2.2.2-linux-x86_64 && ./ViceDesk-2.2.2-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.2.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.3-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.3-linux-x86_64` | `chmod +x ViceDesk-2.2.3-linux-x86_64 && ./ViceDesk-2.2.3-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.3.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.3
+- **Long-form: "could not parse the model's JSON reply" with OpenRouter, Qwen and other reasoning models.** These models write their thinking first (`<think>…</think>`) and sometimes produce slightly broken JSON (trailing commas, curly quotes, comments). Vice Desk now removes the thinking, finds the real answer among any examples, and repairs common mistakes. If it still can't read the reply, it asks the model once to reformat its own answer. Retry resumes from the failed stage.
 
 ### Fixed in 2.2.2
 - **New clips showed the previous output.** Re-cut clips keep their file name, and the app's web view kept showing the cached older video. Clip previews and the player now always load the newest file.

@@ -110,8 +110,17 @@ def pick_topic(d, outliers, topics, idea, topic):
            'Return {"concepts":[{"title":"","angle":"","why":"","needs_facts":[""]}],"pick":0,"pick_reason":""} '
            "where pick is the index of the strongest concept that can be fully sourced from official information.")
     data = llm_json(BRIEF, ask)
-    concept = data["concepts"][int(data.get("pick", 0))]
-    concept["pick_reason"] = data.get("pick_reason", "")
+    concepts = data.get("concepts") if isinstance(data, dict) else data
+    if not concepts:
+        sys.exit("the model returned no concepts: press Retry or choose another model")
+    try:
+        pick = int(data.get("pick", 0)) if isinstance(data, dict) else 0
+    except (TypeError, ValueError):
+        pick = 0
+    concept = concepts[pick if 0 <= pick < len(concepts) else 0]
+    if not isinstance(concept, dict):
+        concept = {"title": str(concept)}
+    concept["pick_reason"] = data.get("pick_reason", "") if isinstance(data, dict) else ""
     wj(d / "research" / "concepts.json", data)
     wj(out, concept)
     return concept
