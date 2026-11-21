@@ -78,7 +78,7 @@ chaquopy {
 
 // Pipeline scripts and the UI are unpacked to real files on first start (runpy and the HTTP server need paths).
 val copyViceBundle by tasks.registering(Sync::class) {
-    from(rootDir.resolve("../scripts")) { into("bundle/scripts"); include("*.py") }
+    from(rootDir.resolve("../scripts")) { into("bundle/scripts"); include("*.py", "fonts/**") }
     from(rootDir.resolve("../app/desk/ui")) { into("bundle/ui") }
     into(layout.buildDirectory.dir("generated/viceAssets"))
 }

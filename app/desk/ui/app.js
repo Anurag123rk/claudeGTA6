@@ -343,12 +343,27 @@ function syncCam(form) {
   const vertical = !form.elements.platform || form.elements.platform.value === "vertical";
   const camLabel = form.querySelector(".cam-only");
   if (camLabel) camLabel.hidden = !(["facecam", "react"].includes(lay) && vertical);
+  const bgLabel = form.querySelector(".bg-only"), pal = form.querySelector(".bg-color-only");
+  if (bgLabel) bgLabel.hidden = lay !== "blur";
+  if (pal) pal.hidden = !(lay === "blur" && form.elements.bg && form.elements.bg.value !== "blur");
+  const ctx = form.querySelector(".ctx-text");
+  if (ctx && form.elements.context) ctx.hidden = !form.elements.context.checked;
   const cam = form.elements.cam;  // phones cannot auto-detect the webcam (no OpenCV): default to a corner
   if (cam && (AND || (S.status && S.status.android)) && cam.value === "auto") cam.value = "top-right";
 }
 $$("form").forEach((f) => { if (f.elements.layout) { f.addEventListener("change", () => syncCam(f)); syncCam(f); } });
 
-const CLIP_KEYS = ["clips", "layout", "platform", "cam", "captions", "punch", "clean_audio", "fps60"];
+const CLIP_KEYS = ["clips", "layout", "platform", "cam", "captions", "punch", "clean_audio", "fps60", "bg", "bg_color", "context", "outro"];
+// the @account is remembered across forms and launches
+function loadHandle() { try { return localStorage.getItem("vd-handle") || ""; } catch (e) { return ""; } }
+$$("input[name=handle]").forEach((el) => {
+  el.value = loadHandle();
+  el.addEventListener("change", () => {
+    let v = el.value.trim(); if (v && !v.startsWith("@")) v = "@" + v; el.value = v;
+    try { localStorage.setItem("vd-handle", v); } catch (e) { /* storage blocked */ }
+    $$("input[name=handle]").forEach((o) => { o.value = v; });
+  });
+});
 function openClipDialog(url, titleCell) {
   const f = $("#clipForm"); f.reset();
   let saved = {}; try { saved = JSON.parse(localStorage.getItem("vd-clipopts") || "{}"); } catch (e) { /* storage blocked */ }
@@ -356,6 +371,7 @@ function openClipDialog(url, titleCell) {
     const el = f.elements[k]; if (!el || saved[k] === undefined) continue;
     if (el.type === "checkbox") el.checked = !!saved[k]; else el.value = saved[k];
   }
+  f.elements.handle.value = loadHandle();
   f.elements.src.value = url;
   const m = (titleCell || "").match(/^\[(.*)\]\(/); $("#clipTitle").textContent = m ? m[1] : url;
   syncCam(f); $("#clipDialog").showModal();
@@ -369,8 +385,8 @@ $("#clipForm").addEventListener("submit", (e) => {
 $("#clipClose").addEventListener("click", () => $("#clipDialog").close());
 $("#clipMore").addEventListener("click", () => {  // hand over to the full Pipeline form (moments, lengths, caption check)
   const f = $("#clipForm"), p = $("#pipeForm");
-  for (const k of ["src", "layout", "platform", "cam", "captions", "hook", "clips"]) if (p.elements[k] && f.elements[k]) p.elements[k].value = f.elements[k].value;
-  for (const k of ["punch", "clean_audio", "fps60"]) if (p.elements[k] && f.elements[k]) p.elements[k].checked = f.elements[k].checked;
+  for (const k of ["src", "layout", "platform", "cam", "captions", "hook", "clips", "bg", "bg_color", "handle", "context_text"]) if (p.elements[k] && f.elements[k]) p.elements[k].value = f.elements[k].value;
+  for (const k of ["punch", "clean_audio", "fps60", "context", "outro"]) if (p.elements[k] && f.elements[k]) p.elements[k].checked = f.elements[k].checked;
   syncCam(p); $("#clipDialog").close(); go("pipeline"); p.elements.src.focus();
 });
 
@@ -398,7 +414,8 @@ document.addEventListener("click", (e) => {
   const lay = b.parentElement.querySelector("select");
   const f = formData($("#pipeForm"));
   run("cut", { job: b.dataset.job, pick: b.dataset.cut, layout: lay ? lay.value : "blur", hook: f.hook, captions: f.captions, caption: f.caption,
-    punch: f.punch, clean_audio: f.clean_audio, fps60: f.fps60, platform: f.platform, cam: f.cam }, "pipeTask");
+    punch: f.punch, clean_audio: f.clean_audio, fps60: f.fps60, platform: f.platform, cam: f.cam,
+    bg: f.bg, bg_color: f.bg_color, context: f.context, context_text: f.context_text, outro: f.outro, handle: f.handle }, "pipeTask");
 });
 
 // ---------------------------------------------------------------- live

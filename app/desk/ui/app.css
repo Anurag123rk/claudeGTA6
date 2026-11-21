@@ -159,3 +159,10 @@ body.android [data-open] { display: none !important; }
 .row.studio { gap: 4px 18px; } .row.studio label.chk { flex: 0 0 auto; } .row.studio label.chk span { padding-bottom: 0; }
 #clipDialog { width: min(560px, 94vw); max-height: 90vh; overflow: auto; }
 #clipDialog .row > label { flex: 1 1 150px; }
+.palette { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.palette .sw { display: inline-flex; cursor: pointer; }
+.palette .sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+.palette .sw i { width: 30px; height: 30px; border-radius: 50%; background: var(--c); border: 2px solid var(--line); box-shadow: inset 0 0 0 2px #0003; transition: transform .12s; }
+.palette .sw input:checked + i { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 0 3px var(--pink); }
+.palette .sw input:focus-visible + i { outline: 2px solid var(--pink2); }
+.brand-opts { display: flex; flex-direction: column; gap: 10px; }

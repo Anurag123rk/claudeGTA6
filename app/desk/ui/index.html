@@ -51,6 +51,18 @@
               <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             </div>
             <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
+            <div class="brand-opts">
+              <div class="row">
+                <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
+              </div>
+              <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
+              <div class="row studio">
+                <label class="chk"><span><input type="checkbox" name="context" checked> Context intro (what the video is about)</span></label>
+                <label class="chk"><span><input type="checkbox" name="outro" checked> Animated end card with @account</span></label>
+              </div>
+              <label class="ctx-text">Context text (blank = written from the video title)<input name="context_text" maxlength="80" placeholder="auto"></label>
+            </div>
             <div class="row studio">
               <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom</span></label>
               <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean audio</span></label>
@@ -114,7 +126,19 @@
             <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             <label class="grow">Hook<input name="hook" maxlength="80" placeholder="optional on-screen opener"></label>
           </div>
-          <div class="row studio">
+          <div class="brand-opts">
+              <div class="row">
+                <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
+              </div>
+              <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
+              <div class="row studio">
+                <label class="chk"><span><input type="checkbox" name="context" checked> Context intro (what the video is about)</span></label>
+                <label class="chk"><span><input type="checkbox" name="outro" checked> Animated end card with @account</span></label>
+              </div>
+              <label class="ctx-text">Context text (blank = written from the video title)<input name="context_text" maxlength="80" placeholder="auto"></label>
+            </div>
+            <div class="row studio">
             <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom on the peak</span></label>
             <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean noisy audio</span></label>
             <label class="chk"><span><input type="checkbox" name="fps60"> Smooth 60 fps (slow)</span></label>
@@ -220,7 +244,19 @@
       <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
     </div>
     <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
-    <div class="row studio">
+    <div class="brand-opts">
+              <div class="row">
+                <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
+              </div>
+              <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
+              <div class="row studio">
+                <label class="chk"><span><input type="checkbox" name="context" checked> Context intro (what the video is about)</span></label>
+                <label class="chk"><span><input type="checkbox" name="outro" checked> Animated end card with @account</span></label>
+              </div>
+              <label class="ctx-text">Context text (blank = written from the video title)<input name="context_text" maxlength="80" placeholder="auto"></label>
+            </div>
+            <div class="row studio">
       <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom</span></label>
       <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean audio</span></label>
       <label class="chk desk-only"><span><input type="checkbox" name="fps60"> Smooth 60 fps (slow)</span></label>

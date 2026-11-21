@@ -1,11 +1,17 @@
-## Vice Desk 2.0.5: Windows, macOS, Linux and Android
+## Vice Desk 2.0.6: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.5-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.0.5-linux-x86_64` | `chmod +x ViceDesk-2.0.5-linux-x86_64 && ./ViceDesk-2.0.5-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.5.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.6-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.0.6-linux-x86_64` | `chmod +x ViceDesk-2.0.6-linux-x86_64 && ./ViceDesk-2.0.6-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.6.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### New in 2.0.6
+- **Context intro.** For the first 3 seconds, a pill under the hook says what the video is about. It's written from the video's title (emoji, hashtags and "| Episode 3" style tails removed, plus "via <channel>"), or you can type your own.
+- **Animated end card with your @account.** For the last 2.5 seconds the frame dims, your @account pops in, an accent underline grows and "Follow for more" fades up. Captions stop before it starts. The clip options ask for your @account once and remember it everywhere.
+- **Background colour palette.** For the blur layout, choose Blurred video, Tinted blur (blur with a colour wash) or Solid colour, with 8 swatches: Vice pink, Sunset, Gold, Mint, Ocean, Neon purple, Night and Snow. The colour also becomes the accent of the intro and end card.
+- **Bundled Inter font.** Captions, hooks and cards now use Inter (SIL Open Font License) on every platform, so clips look the same everywhere and text renders even on phones with unusual system fonts.
 
 ### New in 2.0.5
 - **Retry button.** Every failed or stopped task gets **↻ Retry**, which runs it again with the same settings and continues from where it stopped: a finished download is reused, a partial one resumes, the transcript and moments are kept, and clips already cut with the same settings are skipped. Clips are now written under a temporary name, so a stopped encode can never pass for a finished clip.

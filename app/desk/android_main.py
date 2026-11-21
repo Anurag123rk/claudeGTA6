@@ -86,8 +86,8 @@ def _fontconfig(home):
 <fontconfig>
   <dir>{FONTS}</dir>
   <cachedir>{cache}</cachedir>
-  <alias><family>Arial Black</family><prefer><family>Roboto</family></prefer></alias>
-  <alias><family>Arial</family><prefer><family>Roboto</family></prefer></alias>
+  <alias><family>Inter Black</family><prefer><family>Roboto</family></prefer></alias>
+  <alias><family>Inter</family><prefer><family>Roboto</family></prefer></alias>
 </fontconfig>
 """, encoding="utf-8")
     return conf

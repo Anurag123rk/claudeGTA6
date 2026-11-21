@@ -94,7 +94,81 @@ def export_subs(groups, s0, hook, base):
     subs.save(str(base.with_suffix(".srt")))
 
 
-def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False):
+PALETTE = {  # name -> hex; the UI offers these swatches
+    "vice": "#e8457f", "sunset": "#ff7a3d", "gold": "#f5c542", "mint": "#3ddc97",
+    "ocean": "#2f8cff", "neon": "#9b5cff", "night": "#141018", "snow": "#f4f1ec",
+}
+
+
+def hex_color(c, default="#e8457f"):
+    c = PALETTE.get((c or "").lower(), c or default)
+    c = c if _re.fullmatch(r"#?[0-9a-fA-F]{6}", c or "") else default
+    return "#" + c.lstrip("#").lower()
+
+
+def ass_color(c, alpha=0):
+    """#rrggbb -> ASS &HAABBGGRR."""
+    h = hex_color(c).lstrip("#")
+    return f"&H{alpha:02X}{h[4:6]}{h[2:4]}{h[0:2]}".upper()
+
+
+def tag_color(c):
+    """#rrggbb -> &HBBGGRR& for inline override tags (\\1c, \\3c)."""
+    h = hex_color(c).lstrip("#")
+    return f"&H{h[4:6]}{h[2:4]}{h[0:2]}&".upper()
+
+
+def context_from_title(title, channel=""):
+    """'GTA 6 SECRET 🔥 | Ep 3 #gta6 (4K)' -> 'GTA 6 secret' style: one clean line about what the video is."""
+    t = _re.sub(r"[\U00010000-\U0010FFFF\u2600-\u27BF]", "", title or "")       # emoji
+    t = _re.sub(r"#\w+", "", t)                                                     # hashtags
+    t = _re.sub(r"[\[(][^\])]*[\])]", "", t)                                       # (4K) [LIVE]
+    t = _re.split(r"\s[|•–—]\s|\s-\s", t)[0]                                       # first part only
+    t = " ".join(t.split()).strip(" -:|")
+    if t.isupper() and len(t) > 6:
+        t = t.capitalize()
+    if len(t) > 58:
+        t = t[:58].rsplit(" ", 1)[0] + "…"
+    if channel and t:
+        t += f"  ·  via {channel.strip()[:24]}"
+    return t
+
+
+def brand_events(dur, context, handle, accent, has_hook, pill=None):
+    """Context banner for the first seconds and an animated @handle end card for the last 2.5 s."""
+    ev = []
+    acc = tag_color(accent)
+    pill_c = tag_color(pill or accent)
+    if context:
+        y = int(H * (0.19 if has_hook else 0.085))
+        end = min(3.4, max(1.5, dur - 0.5))
+        # small accent tag + dark pill, sliding down into place
+        ev.append(f"Dialogue: 3,{ts(0.15)},{ts(end)},Ctx,,0,0,0,,{{\\an8\\move({W // 2},{y - 40},{W // 2},{y},0,260)"
+                  f"\\fad(220,260)\\3c{pill_c}}}{esc(context)}")
+    if handle and dur >= 5:
+        h = handle.strip()
+        h = h if h.startswith("@") else "@" + h
+        t0 = max(0.0, dur - 2.5)
+        cy = H // 2
+        bar_w = min(int(W * 0.62), 60 + 44 * len(h))
+        ev += [
+            # dim the frame
+            f"Dialogue: 4,{ts(t0)},{ts(dur)},Fx,,0,0,0,,{{\\an7\\pos(0,0)\\p1\\1c&H000000&\\1a&HFF&\\t(0,350,\\1a&H50&)\\bord0\\shad0}}"
+            f"m 0 0 l {W} 0 {W} {H} 0 {H}{{\\p0}}",
+            # @handle pops in (overshoot then settle)
+            f"Dialogue: 5,{ts(t0 + 0.12)},{ts(dur)},Handle,,0,0,0,,{{\\an5\\pos({W // 2},{cy})\\fad(150,0)"
+            f"\\fscx55\\fscy55\\t(0,260,\\fscx108\\fscy108)\\t(260,420,\\fscx100\\fscy100)}}{esc(h)}",
+            # accent underline grows from the centre
+            f"Dialogue: 5,{ts(t0 + 0.35)},{ts(dur)},Fx,,0,0,0,,{{\\an5\\pos({W // 2},{cy + 78})\\p1\\1c{acc}\\bord0\\shad0"
+            f"\\fscx0\\t(0,380,\\fscx100)}}m 0 0 l {bar_w} 0 {bar_w} 12 0 12{{\\p0}}",
+            # 'Follow for more' fades up
+            f"Dialogue: 5,{ts(t0 + 0.6)},{ts(dur)},OutroSub,,0,0,0,,{{\\an5\\move({W // 2},{cy + 150},{W // 2},{cy + 132},0,300)"
+            f"\\alpha&HFF&\\t(0,300,\\alpha&H00&)}}Follow for more",
+        ]
+    return ev
+
+
+def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False, context="", handle="", accent=None, pill=None):
     hdr = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -103,16 +177,23 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,Arial Black,92,&H00FFFFFF,&H0000E5FF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,7,3,5,60,60,0,1
-Style: Hook,Arial Black,68,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,18,0,8,70,70,170,1
-Style: TitleBox,Arial Black,66,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,1,0,0,5,40,40,0,1
-Style: TitleOut,Arial Black,80,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,9,2,8,50,50,0,1
-Style: Bubble,Arial,58,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,5,60,60,0,1
+Style: Cap,Inter Black,92,&H00FFFFFF,&H0000E5FF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,7,3,5,60,60,0,1
+Style: Hook,Inter Black,68,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,18,0,8,70,70,170,1
+Style: TitleBox,Inter Black,66,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,1,0,0,5,40,40,0,1
+Style: TitleOut,Inter Black,80,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,1,9,2,8,50,50,0,1
+Style: Bubble,Inter,58,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,5,60,60,0,1
+Style: Ctx,Inter,46,&H00FFFFFF,&H00FFFFFF,&H00E8457F,&H40140B18,-1,0,0,0,100,100,1,0,3,14,0,8,60,60,0,1
+Style: Handle,Inter Black,104,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,4,5,40,40,0,1
+Style: OutroSub,Inter,50,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,2,0,1,3,2,5,40,40,0,1
+Style: Fx,Inter,20,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     ev = []
+    dur = e0 - s0
+    if handle and dur >= 5:  # leave the last 2.5 s to the end card
+        words = [w for w in words if w["s"] < e0 - 2.5]
     groups = caption_groups(words, s0, e0, profanity)
     hook_end = 2.6 if hook else 0
     for gi, g in enumerate(groups):
@@ -146,6 +227,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         hook = ''
     if hook:
         ev.append(f"Dialogue: 1,{ts(0)},{ts(hook_end)},Hook,,0,0,0,,{{\\fad(0,180)\\fscx92\\fscy92\\t(0,120,\\fscx100\\fscy100)}}{esc(hook)}")
+    ev += brand_events(dur, context, handle, accent or "#e8457f", bool(hook), pill)
     return hdr + "\n".join(ev) + "\n"
 
 
@@ -164,13 +246,24 @@ def punch_filter(a, b, z):
     return f"scale=w='trunc(iw*{e}/2)*2':h='trunc(ih*{e}/2)*2':eval=frame,crop={W}:{H},"
 
 
-def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, punch=None, fps=30):
+def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, punch=None, fps=30,
+                 bg="blur", bg_color=None):
     """Layout + burned-caption filter graph ending in [vo]. Reused by translate.py."""
     if layout == "fill":
         v = f"[0:v]scale=-2:{H},crop={W}:{H}[v]"
     elif layout == "blur":
-        v = (f"[0:v]split[a][b];[a]scale=-2:{H},crop={W}:{H},boxblur=24:2,eq=brightness=-0.08[bg];"
-             f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-{80 if H > W else 0}[v]")
+        lift = 80 if H > W else 0
+        col = hex_color(bg_color).replace("#", "0x")
+        if bg == "solid":    # flat colour from the palette behind the video
+            v = (f"color=c={col}:s={W}x{H}:r=30[bg];[0:v]scale={W}:-2[fg];"
+                 f"[bg][fg]overlay=(W-w)/2:(H-h)/2-{lift}:shortest=1[v]")
+        elif bg == "tint":   # blurred video washed with the palette colour
+            v = (f"[0:v]split[a][b];[a]scale=-2:{H},crop={W}:{H},boxblur=24:2,eq=brightness=-0.05[bl];"
+                 f"color=c={col}@0.55:s={W}x{H}:r=30[tc];[bl][tc]overlay=shortest=1[bg];"
+                 f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-{lift}[v]")
+        else:
+            v = (f"[0:v]split[a][b];[a]scale=-2:{H},crop={W}:{H},boxblur=24:2,eq=brightness=-0.08[bg];"
+                 f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-{lift}[v]")
     elif layout == 'react':
         sw, sh = src
         if face_expr:  # tracked face crop (no cam frame)
@@ -194,9 +287,12 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{ch}:force_original_aspect_ratio=increase,"
              f"crop={W}:{ch}[cam];[b]scale=-2:{gh},crop={W}:{gh}[game];[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
-    fonts = os.environ.get("VICE_FONTS_DIR")
+    # bundled Inter fonts: the same look on every platform, and text renders even where system fonts are missing
+    fonts = str(Path(__file__).resolve().parent / "fonts")
+    if not os.path.isdir(fonts):
+        fonts = os.environ.get("VICE_FONTS_DIR", "")
     if fonts:
-        sub += "':fontsdir='" + fonts.replace(":", "\\:")
+        sub += "':fontsdir='" + fonts.replace("\\", "/").replace(":", "\\:")
     zoom = punch_filter(*punch) if punch else ""
     # 60 fps: motion-compensated interpolation (a CPU stand-in for RIFE); slow, so it is opt-in
     rate = "fps=30" if fps != 60 else "minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
@@ -258,6 +354,10 @@ def main():
     ap.add_argument("--platform", choices=list(PLATFORMS), default="vertical",
                     help="vertical 9:16 (TikTok/Reels/Shorts), landscape 16:9 (YouTube/X), feed 4:5, square 1:1")
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
+    ap.add_argument("--context", default="", help='"auto" = a line about the video from its title, or your own text')
+    ap.add_argument("--outro-handle", default="", help="end the clip with an animated card showing this @account")
+    ap.add_argument("--bg", choices=["blur", "tint", "solid"], default="blur", help="background of the blur layout")
+    ap.add_argument("--bg-color", default="vice", help="palette name (" + ", ".join(PALETTE) + ") or #rrggbb")
     ap.add_argument("--punch", type=float, default=0, help="zoom in this much on the peak moment, e.g. 0.15 (0 = off)")
     ap.add_argument("--clean-audio", action="store_true", help="reduce mic/background noise before loudness normalising")
     ap.add_argument("--fps", type=int, choices=[30, 60], default=30, help="60 = smooth motion interpolation (slow)")
@@ -336,7 +436,16 @@ def main():
     ass = out / f"clip_{a.pick}.ass"
     caps = a.captions
     cap_words = words if caps != 'none' else []
-    ass.write_text(build_ass(cap_words, s0, e0, a.hook, cap_y, title=title, caps=caps, profanity=a.allow_profanity), encoding="utf-8")
+    info = c.get("info", {})
+    context = a.context.strip()
+    if context.lower() == "auto":
+        context = context_from_title(info.get("title") or "", info.get("channel") or info.get("uploader") or "")
+    accent = hex_color(a.bg_color)
+    if accent in ("#141018", "#f4f1ec"):  # black/white backgrounds: keep the brand pink as the accent
+        accent = "#e8457f"
+    ass.write_text(build_ass(cap_words, s0, e0, a.hook, cap_y, title=title, caps=caps, profanity=a.allow_profanity,
+                             context=context, handle=a.outro_handle, accent=accent,
+                             pill="#141018" if a.bg == "solid" else None), encoding="utf-8")  # dark pill on flat colour
     src = None; gx = None
     if layout == 'react':
         from common import ffprobe
@@ -350,7 +459,7 @@ def main():
         punch = (max(0.0, peak - 0.4), min(e0 - s0, peak + 1.8), min(a.punch, 0.4))
         print(f"punch-in at {peak:.1f}s (+{punch[2] * 100:.0f}%)")
     v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr,
-                     punch=punch, fps=a.fps)
+                     punch=punch, fps=a.fps, bg=a.bg, bg_color=a.bg_color)
     af = ("highpass=f=80,afftdn=nr=12:nf=-30," if a.clean_audio else "") + "loudnorm=I=-14:TP=-1.5:LRA=11"
     mp4 = out / f"clip_{a.pick}.mp4"
     part = out / f"clip_{a.pick}.part.mp4"  # renamed to clip_N.mp4 only when the encode completes
@@ -363,10 +472,12 @@ def main():
     part.replace(mp4)
     if cap_words or a.hook:
         export_subs(caption_groups(cap_words, s0, e0, a.allow_profanity), s0, a.hook, out / f"clip_{a.pick}")
-    info = c.get("info", {})
     save_json(out / f"clip_{a.pick}.json", {"file": str(mp4), "start": s0, "end": e0, "layout": layout,
                                             "punch": a.punch, "clean_audio": a.clean_audio, "fps": a.fps,
-                                            "platform": a.platform, "width": W, "height": H, "hook": a.hook or a.title, "title": a.title, "cam": cam,
+                                            "platform": a.platform, "width": W, "height": H,
+                                            "bg": a.bg, "bg_color": hex_color(a.bg_color), "context": context,
+                                            "outro_handle": a.outro_handle, "bg_color_name": a.bg_color,
+                                            "context_on": bool(a.context.strip()), "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)

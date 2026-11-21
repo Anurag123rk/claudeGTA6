@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.0.5"
+VERSION = "2.0.6"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -672,6 +672,12 @@ def _cut_args(job, n, p):
         a += ["--start", p["start"]]
     if p.get("end") not in (None, ""):
         a += ["--end", p["end"]]
+    if p.get("context"):
+        a += ["--context", (p.get("context_text") or "").strip() or "auto"]
+    handle = (p.get("handle") or "").strip()
+    if p.get("outro") and handle:
+        a += ["--outro-handle", handle]
+    a += ["--bg", p.get("bg") or "blur", "--bg-color", p.get("bg_color") or "vice"]
     if p.get("punch"):
         a += ["--punch", 0.15]
     if p.get("clean_audio"):
@@ -733,7 +739,10 @@ def _clip_done(job, n, p):
         return False
     want = {"layout": p.get("layout") or "blur", "platform": p.get("platform") or "vertical",
             "punch": 0.15 if p.get("punch") else 0, "clean_audio": bool(p.get("clean_audio")),
-            "fps": 60 if p.get("fps60") else 30, "hook": p.get("hook") or ""}
+            "fps": 60 if p.get("fps60") else 30, "hook": p.get("hook") or "",
+            "bg": p.get("bg") or "blur", "bg_color_name": p.get("bg_color") or "vice",
+            "outro_handle": (p.get("handle") or "").strip() if p.get("outro") else "",
+            "context_on": bool(p.get("context"))}
     return all(m.get(k, want[k]) == v for k, v in want.items() if k != "layout") and \
         (m.get("layout") == want["layout"] or want["layout"] in ("facecam", "react"))  # facecam may fall back to blur
 
