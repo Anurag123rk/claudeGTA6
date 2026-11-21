@@ -2,6 +2,12 @@
 import hashlib, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 
+for _st in (sys.stdout, sys.stderr):  # emoji in titles must not crash a cp1252 Windows console
+    try:
+        _st.reconfigure(errors="replace")
+    except Exception:
+        pass
+
 ROOT = Path(os.environ.get("CLIP_DESK_HOME", Path.cwd()))
 JOBS = ROOT / "jobs"
 

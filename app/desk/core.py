@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 
@@ -61,7 +61,7 @@ def default_workspace():
 
 
 class Settings:
-    DEFAULTS = {"workspace": "", "whisper_model": "small", "twitch_client_id": "", "twitch_token": ""}
+    DEFAULTS = {"workspace": "", "whisper_model": "small", "model_choice_done": "", "twitch_client_id": "", "twitch_token": ""}
 
     def __init__(self):
         self.path = config_dir() / "settings.json"
@@ -98,11 +98,11 @@ SETTINGS = Settings()
 
 def child_env(extra=None):
     env = dict(os.environ)
-    env["PATH"] = str(bin_dir()) + os.pathsep + env.get("PATH", "")
+    env["PATH"] = os.pathsep.join([str(bundle_dir() / "bin"), str(bin_dir()), env.get("PATH", "")])
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     env["CLIP_DESK_HOME"] = str(SETTINGS.workspace)
-    env["WHISPER_MODEL"] = SETTINGS.data.get("whisper_model") or "small"
+    env["WHISPER_MODEL"] = whisper_model_ref(SETTINGS.data.get("whisper_model") or "base")
     if SETTINGS.data.get("twitch_client_id") and SETTINGS.data.get("twitch_token"):
         env["TWITCH_CLIENT_ID"] = SETTINGS.data["twitch_client_id"]
         env["TWITCH_TOKEN"] = SETTINGS.data["twitch_token"]
@@ -122,11 +122,43 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 # ---------------------------------------------------------------- tools
 
+WHISPER_MODELS = [  # name, approx download, what it is good for
+    {"name": "tiny", "size": "75 MB", "speed": "fastest", "quality": "rough captions, fine for loud hype clips"},
+    {"name": "base", "size": "145 MB", "speed": "fast", "quality": "good captions for clear speech"},
+    {"name": "small", "size": "485 MB", "speed": "medium", "quality": "recommended: accurate captions, handles slang"},
+    {"name": "medium", "size": "1.5 GB", "speed": "slow on CPU", "quality": "best accuracy, needs a strong PC or NVIDIA GPU"},
+]
+MODEL_FILES = ("config.json", "model.bin", "tokenizer.json", "vocabulary.txt", "vocabulary.json", "preprocessor_config.json")
+
+
+def models_dir():
+    d = bin_dir().parent / "models"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def installed_models():
+    return sorted(x.name for x in models_dir().iterdir() if (x / "model.bin").exists() and not (x / ".partial").exists())
+
+
+def bundled_models():
+    d = bundle_dir() / "models"
+    return sorted(x.name for x in d.iterdir() if (x / "model.bin").exists()) if d.exists() else []
+
+
+def whisper_model_ref(name):
+    """A bundled model is passed as its folder (works offline); anything else is downloaded by faster-whisper."""
+    for d in (models_dir() / name, bundle_dir() / "models" / name):
+        if (d / "model.bin").exists() and not (d / ".partial").exists():
+            return str(d)
+    return name
+
+
 def find_tool(name):
     exe = name + (".exe" if IS_WIN else "")
-    local = bin_dir() / exe
-    if local.exists():
-        return str(local)
+    for local in (bundle_dir() / "bin" / exe, bin_dir() / exe):
+        if local.exists():
+            return str(local)
     return shutil.which(name)
 
 
@@ -146,7 +178,8 @@ def tool_status():
         ok = importlib.util.find_spec("faster_whisper") is not None
     except Exception:
         ok = False
-    out["faster-whisper"] = {"ok": ok, "path": "bundled" if ok else ""}
+    m = installed_models() + [x for x in bundled_models() if x not in installed_models()]
+    out["faster-whisper"] = {"ok": ok and bool(m), "models": m, "path": ("models: " + ", ".join(m)) if (ok and m) else ("no speech model yet" if ok else "")}
     return out
 
 
@@ -602,9 +635,35 @@ def runner_live(p):
     return r
 
 
+def stream_download(t, url, sink, done_before=0, grand_total=None, source="download", label=""):
+    """Stream url into sink (file-like), reporting bytes / speed / ETA on the task. Returns bytes written."""
+    import requests
+    with requests.get(url, stream=True, timeout=30) as resp:
+        resp.raise_for_status()
+        size = int(resp.headers.get("content-length") or 0) or None
+        total = grand_total or size
+        got, win = 0, collections.deque()
+        for chunk in resp.iter_content(256 * 1024):
+            if t.cancel_flag.is_set():
+                raise Cancelled()
+            sink.write(chunk); got += len(chunk)
+            now = time.time(); win.append((now, got))
+            while len(win) > 2 and now - win[0][0] > 3:
+                win.popleft()
+            sp = (got - win[0][1]) / max(0.05, now - win[0][0]) if len(win) > 1 else 0
+            cur = done_before + got
+            eta = (total - cur) / sp if (total and sp) else None
+            t.download = {"bytes": cur, "total": total, "speed": sp, "eta": eta, "part": 1, "source": source}
+            t._last_vprog = now
+            t.stage_frac = min(1.0, cur / total) if total else None
+            t.detail = (label + " " if label else "") + (f"{fmt_bytes(cur)} of {fmt_bytes(total)}" if total else fmt_bytes(cur))
+            t.touch()
+    return got
+
+
 def runner_install_ffmpeg(p):
     def r(t):
-        import io, requests
+        import io
         t.step = "Install ffmpeg"
         if not IS_WIN:
             raise RuntimeError("Automatic install is for Windows. Install ffmpeg with your package manager "
@@ -615,24 +674,7 @@ def runner_install_ffmpeg(p):
                 t.stage, t.stage_frac = "Downloading ffmpeg", 0.0
                 t.add_log("downloading " + url)
                 data = io.BytesIO()
-                with requests.get(url, stream=True, timeout=30) as resp:
-                    resp.raise_for_status()
-                    total = int(resp.headers.get("content-length") or 0) or None
-                    got, win = 0, collections.deque()
-                    for chunk in resp.iter_content(256 * 1024):
-                        if t.cancel_flag.is_set():
-                            raise Cancelled()
-                        data.write(chunk); got += len(chunk)
-                        now = time.time(); win.append((now, got))
-                        while len(win) > 2 and now - win[0][0] > 3:
-                            win.popleft()
-                        sp = (got - win[0][1]) / max(0.05, now - win[0][0]) if len(win) > 1 else 0
-                        eta = (total - got) / sp if (total and sp) else None
-                        t.download = {"bytes": got, "total": total, "speed": sp, "eta": eta, "part": 1, "source": "ffmpeg"}
-                        t._last_vprog = now
-                        t.stage_frac = got / total if total else None
-                        t.detail = f"{fmt_bytes(got)} of {fmt_bytes(total)}" if total else fmt_bytes(got)
-                        t.touch()
+                stream_download(t, url, data, source="ffmpeg")
                 t.stage, t.stage_frac, t.detail = "Unpacking", None, ""
                 t.add_log("unpacking")
                 with zipfile.ZipFile(data) as z:
@@ -655,8 +697,51 @@ def runner_install_ffmpeg(p):
     return r
 
 
+def runner_install_model(p):
+    """Download a faster-whisper model from Hugging Face into the app's models folder, with live speed."""
+    def r(t):
+        import requests
+        name = p.get("model") or "small"
+        if name not in [m["name"] for m in WHISPER_MODELS]:
+            raise RuntimeError(f"unknown model {name}")
+        repo = f"Systran/faster-whisper-{name}"
+        hub = os.environ.get("HF_ENDPOINT", "https://huggingface.co").rstrip("/")  # mirror support
+        t.step = f"Download speech model: {name}"
+        t.stage, t.stage_i, t.stage_n = "Listing files", 1, 2
+        tree = requests.get(f"{hub}/api/models/{repo}/tree/main", timeout=30)
+        tree.raise_for_status()
+        files = [(f["path"], (f.get("lfs") or {}).get("size") or f.get("size") or 0)
+                 for f in tree.json() if f.get("type") == "file" and f["path"] in MODEL_FILES]
+        if not any(f == "model.bin" for f, _ in files):
+            raise RuntimeError(f"{repo} has no model.bin")
+        total = sum(sz for _, sz in files) or None
+        dest = models_dir() / name
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / ".partial").write_text("downloading", encoding="utf-8")
+        t.stage, t.stage_i, t.stage_n = "Downloading model", 0, 0  # main bar = download progress
+        done = 0
+        for fname, sz in files:
+            target = dest / fname
+            if target.exists() and sz and target.stat().st_size == sz:
+                done += sz
+                continue
+            tmp = target.with_suffix(target.suffix + ".part")
+            t.add_log(f"downloading {fname} ({fmt_bytes(sz)})")
+            with open(tmp, "wb") as fh:
+                got = stream_download(t, f"{hub}/{repo}/resolve/main/{fname}", fh, done_before=done,
+                                      grand_total=total, source=hub.split("//")[-1], label=fname)
+            tmp.replace(target)
+            done += sz or got
+        (dest / ".partial").unlink(missing_ok=True)
+        SETTINGS.update(whisper_model=name, model_choice_done="1")
+        t.add_log(f"model {name} ready in {dest}")
+        t.result = {"model": name, "path": str(dest)}
+    return r
+
+
 RUNNERS = {"trends": runner_trends, "streams": runner_streams, "moments": runner_moments, "cut": runner_cut,
-           "check": runner_check, "pipeline": runner_pipeline, "live": runner_live, "install_ffmpeg": runner_install_ffmpeg}
+           "check": runner_check, "pipeline": runner_pipeline, "live": runner_live, "install_ffmpeg": runner_install_ffmpeg,
+           "install_model": runner_install_model}
 
 
 # ---------------------------------------------------------------- library

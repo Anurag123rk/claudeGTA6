@@ -8,6 +8,10 @@ SCRIPTS = os.path.join(HERE, "..", "scripts")
 
 datas = [(os.path.join(HERE, "desk", "ui"), "ui"), (SCRIPTS, "scripts")]
 binaries = []
+# ffmpeg/ffprobe placed in app/vendor/bin by the CI workflow are shipped inside the .exe (bin/)
+VENDOR = os.path.join(HERE, "vendor", "bin")
+if os.path.isdir(VENDOR):
+    binaries += [(os.path.join(VENDOR, f), "bin") for f in os.listdir(VENDOR)]
 hiddenimports = collect_submodules("yt_dlp") + collect_submodules("desk")
 # the pipeline scripts are run from data files; list them so their imports get bundled too
 hiddenimports += ["common", "moments", "cut", "check", "trends", "streams", "live", "twitch", "facecam",

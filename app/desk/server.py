@@ -141,7 +141,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             return self._json({"app": core.APP_NAME, "version": core.VERSION, "tools": core.tool_status(),
                                "settings": core.SETTINGS.public(), "workspace": str(core.SETTINGS.workspace),
-                               "platform": sys.platform, "frozen": core.FROZEN, "bin": str(core.bin_dir())})
+                               "platform": sys.platform, "frozen": core.FROZEN, "bin": str(core.bin_dir()),
+                               "models": core.WHISPER_MODELS, "installed_models": core.installed_models(),
+                               "first_run": not core.SETTINGS.data.get("model_choice_done") and not core.installed_models()})
         if path == "/api/events":
             return self._events()
         if path == "/api/tasks":
@@ -176,6 +178,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, f"missing {need}")
             if need:
                 p[need] = str(p[need]).strip().strip('"')
+            if kind in ("moments", "pipeline"):
+                src = p["src"]
+                if "\n" in src or len(src) > 2000:
+                    return self._err(400, "Paste a single video URL or file path.")
+                if not src.startswith(("http://", "https://")) and not Path(src).expanduser().is_file():
+                    return self._err(400, f"Not a video URL and no such file: {src[:120]}")
+            if kind == "live" and not p["url"].startswith(("http://", "https://")):
+                return self._err(400, "Live mode needs a stream URL (https://...).")
             if kind in ("moments", "pipeline", "cut", "live") and not core.find_tool("ffmpeg"):
                 return self._err(400, "ffmpeg is not installed yet. Install it from the Dashboard first.")
             title = {"trends": "Trend radar: " + (p.get("query") or "gta 6"),
@@ -183,7 +193,8 @@ class Handler(BaseHTTPRequestHandler):
                      "moments": "Find moments: " + p.get("src", ""), "pipeline": "Full pipeline: " + p.get("src", ""),
                      "cut": f"Cut clip {p.get('pick')}: " + Path(p.get("job", "")).name,
                      "check": "Rule check: " + Path(p.get("clip", "")).name, "live": "Live: " + p.get("url", ""),
-                     "install_ffmpeg": "Install ffmpeg"}[kind]
+                     "install_ffmpeg": "Install ffmpeg",
+                     "install_model": "Download speech model: " + str(p.get("model", ""))}[kind]
             t = TASKS.start(kind, title, p, core.RUNNERS[kind](p))
             return self._json({"id": t.id})
         if path.startswith("/api/tasks/") and path.endswith("/cancel"):

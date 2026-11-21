@@ -172,6 +172,11 @@ function onFinished(t) {
     loadJobs(true);
   }
   if (t.kind === "install_ffmpeg") loadStatus();
+  if (t.kind === "install_model") {
+    $$("#modelCards button").forEach((b) => (b.disabled = false));
+    if (t.state === "done") { $("#firstRun").hidden = true; toast(`Speech model <b>${esc(t.result.model)}</b> is ready. You're all set!`); go("dashboard"); }
+    loadStatus();
+  }
 }
 
 async function run(kind, params, slot) {
@@ -192,6 +197,9 @@ async function loadStatus() {
     $("#wsLink").textContent = s.workspace; $("#wsLink").dataset.open = s.workspace;
     const names = { ffmpeg: "ffmpeg (video engine)", ffprobe: "ffprobe", "yt-dlp": "yt-dlp (downloader)", "faster-whisper": "faster-whisper (captions)" };
     $("#toolList").innerHTML = Object.entries(s.tools).map(([k, v]) => `<li><span>${names[k] || k}<br><span class="muted small mono">${esc(v.path || "missing")}</span></span><span class="st ${v.ok ? "ok" : "bad"}">${v.ok ? "✓ ready" : "✗ missing"}</span></li>`).join("");
+    renderModelCards(s); fillModelSelect(s);
+    const modelBusy = S.tasks.some((x) => x.kind === "install_model" && x.state === "running");
+    if (s.first_run || modelBusy) $("#firstRun").hidden = false;
     const b = $("#setupBanner");
     if (!s.tools.ffmpeg.ok || !s.tools.ffprobe.ok) {
       b.hidden = false;
@@ -199,11 +207,40 @@ async function loadStatus() {
         ? `<span><b>ffmpeg is needed</b> to cut clips. One click downloads it (about 100 MB); you'll see the download speed live.</span><button class="primary" id="instFF">Install ffmpeg</button>`
         : `<span><b>ffmpeg is missing.</b> Install it with your package manager (<code>sudo apt install ffmpeg</code> / <code>brew install ffmpeg</code>), then restart.</span>`;
       const btn = $("#instFF"); if (btn) btn.onclick = () => run("install_ffmpeg", {});
+    } else if (!(s.installed_models || []).length) {
+      b.hidden = false;
+      b.innerHTML = `<span><b>No speech model yet.</b> Clips are cut without captions until you download one.</span><button class="primary" id="pickModel">Choose model</button>`;
+      $("#pickModel").onclick = () => { $("#firstRun").hidden = false; };
     } else b.hidden = true;
   } catch (e) {
     $("#toolList").innerHTML = `<li class="bad">Could not reach the local engine: ${esc(e.message)}. <button class="sm" onclick="loadStatus()">Retry</button></li>`;
   }
 }
+function renderModelCards(st) {
+  const inst = st.installed_models || [];
+  $("#modelCards").innerHTML = st.models.map((m) => `<div class="model ${m.name === "small" ? "rec" : ""}">
+    <b>${esc(m.name)}</b><span class="sz">${esc(m.size)} · ${esc(m.speed)}</span><p>${esc(m.quality)}</p>
+    <button class="${m.name === "small" ? "primary" : ""}" data-model="${m.name}">${inst.includes(m.name) ? "Use (installed)" : "Download"}</button></div>`).join("");
+}
+function fillModelSelect(st) {
+  const sel = $("#setForm [name=whisper_model]"); const inst = st.installed_models || [];
+  sel.innerHTML = st.models.map((m) => `<option value="${m.name}">${m.name} · ${m.size} · ${inst.includes(m.name) ? "installed" : "not downloaded"}</option>`).join("");
+  sel.value = st.settings.whisper_model;
+}
+async function chooseModel(name, slot) {
+  const st = S.status || {};
+  if ((st.installed_models || []).includes(name)) {
+    await api("/api/settings", { whisper_model: name, model_choice_done: "1" });
+    $("#firstRun").hidden = true; toast(`Using the <b>${esc(name)}</b> model.`); loadStatus(); return;
+  }
+  $$("#modelCards button").forEach((b) => (b.disabled = true));
+  const id = await run("install_model", { model: name }, slot);
+  if (!id) $$("#modelCards button").forEach((b) => (b.disabled = false));
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-model]"); if (b) chooseModel(b.dataset.model, "modelTask"); });
+$("#skipModel").addEventListener("click", async (e) => { e.preventDefault(); await api("/api/settings", { model_choice_done: "1" }); $("#firstRun").hidden = true; loadStatus(); });
+$("#dlModel").addEventListener("click", () => chooseModel($("#setForm [name=whisper_model]").value, "setModelTask"));
+
 $("#quickForm").addEventListener("submit", (e) => { e.preventDefault(); run("pipeline", formData(e.target)); });
 $("#openWs").addEventListener("click", () => api("/api/open", {}).catch((er) => toast(esc(er.message))));
 
@@ -327,7 +364,8 @@ $("#closePlayer").addEventListener("click", () => { const v = $("#video"); v.pau
 async function loadSettings() {
   try {
     const s = await api("/api/status"); const f = $("#setForm");
-    for (const [k, v] of Object.entries(s.settings)) if (f.elements[k] && k !== "twitch_token") f.elements[k].value = v;
+    fillModelSelect(s);
+    for (const [k, v] of Object.entries(s.settings)) if (f.elements[k] && k !== "twitch_token" && k !== "whisper_model") f.elements[k].value = v;
     f.elements.twitch_token.placeholder = s.settings.twitch_token ? "saved (leave empty to keep)" : "optional";
     const c = await api("/api/text?name=campaigns.md"); $("#campaigns").value = c.text;
   } catch (e) { toast(esc(e.message)); }

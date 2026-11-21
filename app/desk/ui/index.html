@@ -156,9 +156,11 @@
       <div class="card">
         <form id="setForm" class="stack">
           <label>Workspace folder (jobs, clips and reports go here)<input name="workspace" class="mono"></label>
-          <label>Speech model<select name="whisper_model">
-            <option value="tiny">tiny (fastest, ~75 MB)</option><option value="base">base (~145 MB)</option>
-            <option value="small">small (recommended, ~460 MB)</option><option value="medium">medium (best, ~1.5 GB, slow on CPU)</option></select></label>
+          <div class="row">
+            <label class="grow">Speech model (captions)<select name="whisper_model"></select></label>
+            <button type="button" id="dlModel">Download this model</button>
+          </div>
+          <div id="setModelTask" class="tasks"></div>
           <div class="row">
             <label class="grow">Twitch Client-ID (optional)<input name="twitch_client_id" autocomplete="off"></label>
             <label class="grow">Twitch token (optional)<input name="twitch_token" type="password" autocomplete="off" placeholder="leave empty to keep"></label>
@@ -179,6 +181,16 @@
       </div>
     </section>
   </main>
+</div>
+<div id="firstRun" class="overlay" hidden>
+  <div class="welcome">
+    <div class="brand"><span class="logo">V</span><div><b>Welcome to Vice Desk</b><small>one-time setup</small></div></div>
+    <h1>Choose your speech model</h1>
+    <p class="muted">It writes the word-by-word captions on your clips. It downloads once, then everything runs offline. You can change it later in Settings.</p>
+    <div id="modelCards" class="models"></div>
+    <div id="modelTask" class="tasks"></div>
+    <div class="row end"><a href="#" id="skipModel" class="small">Skip for now (clips without captions)</a></div>
+  </div>
 </div>
 <div id="toast" class="toast" hidden></div>
 <dialog id="player"><div class="card-h"><b id="playerTitle"></b><button id="closePlayer">Close</button></div><video id="video" controls playsinline></video></dialog>

@@ -34,6 +34,20 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-app.txt
 
+      - name: Fetch ffmpeg to bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force app/vendor/bin | Out-Null
+          $urls = @("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+                    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip")
+          foreach ($u in $urls) {
+            try { Invoke-WebRequest -UseBasicParsing $u -OutFile ffmpeg.zip; break } catch { Write-Host "failed $u : $_" }
+          }
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-x -Force
+          Get-ChildItem ffmpeg-x -Recurse -Include ffmpeg.exe, ffprobe.exe | Copy-Item -Destination app/vendor/bin
+          Get-ChildItem app/vendor/bin
+          if (-not (Test-Path app/vendor/bin/ffmpeg.exe) -or -not (Test-Path app/vendor/bin/ffprobe.exe)) { throw "ffmpeg not found in archive" }
+
       - name: Read version
         id: ver
         shell: bash
@@ -68,7 +82,8 @@ jobs:
           $tok = [regex]::Match($r.Content, 'DESK_TOKEN = "([^"]+)"').Groups[1].Value
           $s = Invoke-RestMethod -Headers @{ "X-Desk-Token" = $tok } http://127.0.0.1:8765/api/status
           Write-Host ($s | ConvertTo-Json -Depth 4)
-          if (-not $s.tools.'faster-whisper'.ok) { throw "faster-whisper not bundled" }
+          if (-not $s.tools.ffmpeg.ok -or $s.tools.ffmpeg.path -notmatch "_MEI") { throw "bundled ffmpeg not used: $($s.tools.ffmpeg.path)" }
+          if (-not $s.first_run) { throw "first-run model picker should show on a clean machine" }
           Stop-Process -Id $p.Id -Force
           Get-Item $exe | Select-Object Name, Length
 

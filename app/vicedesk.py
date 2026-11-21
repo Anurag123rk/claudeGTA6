@@ -15,14 +15,22 @@ if str(HERE) not in sys.path:
 
 
 def _fix_streams():
-    """A windowed .exe can start without stdout/stderr; give child mode real streams when the handles exist."""
+    """Child mode writes UTF-8, line by line. A frozen .exe ignores PYTHONIOENCODING/PYTHONUNBUFFERED, so on
+    Windows the default would be cp1252 (crashes on emoji in video titles) and block-buffered (late progress).
+    A windowed .exe can also start without stdout/stderr; give it real streams when the handles exist."""
     for fd, name in ((1, "stdout"), (2, "stderr")):
-        if getattr(sys, name) is None:
+        st = getattr(sys, name)
+        if st is not None:
             try:
-                setattr(sys, name, io.TextIOWrapper(io.FileIO(fd, "w", closefd=False), encoding="utf-8",
-                                                    errors="replace", line_buffering=True))
-            except OSError:
-                setattr(sys, name, open(os.devnull, "w"))
+                st.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+                continue
+            except Exception:
+                pass
+        try:
+            setattr(sys, name, io.TextIOWrapper(io.FileIO(fd, "w", closefd=False), encoding="utf-8",
+                                                errors="replace", line_buffering=True))
+        except OSError:
+            setattr(sys, name, open(os.devnull, "w"))
 
 
 def _no_console_windows():

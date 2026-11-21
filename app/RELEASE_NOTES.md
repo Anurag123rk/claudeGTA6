@@ -1,27 +1,24 @@
-## Vice Desk: GTA 6 clip pipeline for Windows
+## Vice Desk 1.1.0: GTA 6 clip pipeline for Windows
 
-**Download `ViceDesk.exe` below and double-click it.** No Python, no install, no login.
+**Download `ViceDesk.exe` below and double-click it.** No Python, no ffmpeg install, no login.
 
-### What's new
-- **One-file Windows app (GUI).** Replaces the old web control room and its "download as zip" archive.
-- **No login.** The Internet Identity sign-in and the cloud backend are gone. Everything runs on your PC.
-- **Front page loads instantly.** The dashboard no longer waits on a remote backend, so it can't hang on loading.
-- **Live monitor.** Every task shows step, stage and overall %, with the live log beside it.
-- **Download speed.** Live MB/s, downloaded/total, ETA and a speed graph for video downloads, the speech-model download and the ffmpeg installer, plus a network meter in the sidebar.
-- **Pipeline fixes**
-  - Downloads report progress instead of running silently.
-  - A failed speech-model download no longer kills the run: moments are scored on loudness, "most replayed" and chat, and clips are cut without captions.
-  - `cut.py` no longer crashes when a job has no transcript, and gives a clear error for an unknown pick number.
-  - Live recordings stop cleanly from the GUI and still cut pending spikes.
-  - Encoding shows real progress.
-  - The full pipeline skips one bad moment (e.g. no facecam) instead of failing the batch.
+### What's new in 1.1.0
+- **ffmpeg is built in.** Nothing extra to install.
+- **First-launch model picker.** Choose your speech model (tiny / base / small / medium). It downloads once with live speed, progress and ETA, then the app carries on to the dashboard and works offline. Change or add models any time in Settings.
+- **Fixed: Trend radar crash on Windows** (`UnicodeEncodeError: 'charmap' codec can't encode character`) when video titles contain emoji. Progress lines also arrive in real time now instead of in bursts.
+- **Fixed: garbage in the URL box.** Pasted text that isn't a URL or an existing file is rejected with a clear message instead of failing mid-pipeline.
+
+### Also in this app (since 1.0.0)
+- No login and no cloud backend; the front page loads instantly.
+- Live monitor for every task: step, stage, overall %, live log, download speed, ETA and a speed graph.
+- One-click full pipeline: download → transcribe → score moments → cut 1080x1920 clips → rule check.
+- Trend radar, live-stream finder, live recording with chat-spike clips, and a clip library with previews.
 
 ### First run
 1. Windows SmartScreen may warn because the app is unsigned: click **More info → Run anyway**.
-2. On the dashboard, click **Install ffmpeg** (one time, ~100 MB, with a live speed readout).
+2. Pick a speech model (**small** is recommended) and wait for the download.
 3. Paste a YouTube/Twitch VOD URL or a local video file and click **Run full pipeline**.
 
-The first transcription downloads the speech model (~460 MB for "small", configurable in Settings).
-Clips, reports and jobs go to `Documents\ViceDesk`. You approve every post; nothing is uploaded.
+Clips, reports and jobs go to `Documents\ViceDesk`. Models are stored in `%LOCALAPPDATA%\ViceDesk\models`. You approve every post; nothing is uploaded.
 
 Needs Windows 10/11 (64-bit) with the Edge WebView2 runtime, which ships with Windows 11 and current Windows 10. Without it, the app opens in your default browser instead.
