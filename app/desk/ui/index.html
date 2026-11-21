@@ -212,7 +212,7 @@
         </div>
         <div class="row end"><span class="muted small" id="aiState"></span><button type="button" id="aiTest">Test</button><button type="button" class="primary" id="aiSave">Save</button></div>
         <details class="small"><summary>Voice: ElevenLabs (optional)</summary>
-          <p class="muted small">With an ElevenLabs key the guide is voiced by a professional voice. Without one, the desktop app uses a free Microsoft voice.</p>
+          <p class="muted small">With an ElevenLabs key the guide is voiced by a professional voice. Without one, a free Microsoft voice is used; on Android, the phone's own voice takes over if that can't be reached.</p>
           <div class="row"><label class="grow">ElevenLabs API key<input id="elKey" type="password" autocomplete="off" placeholder="paste your key"></label>
             <button type="button" id="elGetKey">Get key</button></div>
           <label>Voice ID (optional; blank = first voice on your account)<input id="elVoice" placeholder="e.g. a voice ID from your ElevenLabs voice library"></label>
@@ -239,7 +239,7 @@
           </div>
           <div class="row">
             <label>Length (min)<input name="minutes" type="number" min="2" max="20" value="8"></label>
-            <label>Voice<select name="voice"><option value="auto">ElevenLabs if set, else free</option><option value="elevenlabs">ElevenLabs</option><option value="free">Free voice (desktop)</option><option value="none">No voice</option></select></label>
+            <label>Voice<select name="voice"><option value="auto">ElevenLabs if set, else free</option><option value="elevenlabs">ElevenLabs</option><option value="free">Free Microsoft voice (phone voice if offline)</option><option value="phone">Phone's built-in voice (Android, offline)</option><option value="none">No voice</option></select></label>
           </div>
           <label>Official footage URLs (optional, one per line; blank = Rockstar Games' own trailers)<textarea name="footage" rows="2" class="mono"></textarea></label>
           <div class="row studio"><label class="chk"><span><input type="checkbox" name="fresh"> Start a new guide (otherwise resume the last one)</span></label></div>

@@ -1,11 +1,15 @@
-## Vice Desk 2.2.5: Windows, macOS, Linux and Android
+## Vice Desk 2.2.6: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.5-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.5-linux-x86_64` | `chmod +x ViceDesk-2.2.5-linux-x86_64 && ./ViceDesk-2.2.5-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.5.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.6-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.6-linux-x86_64` | `chmod +x ViceDesk-2.2.6-linux-x86_64 && ./ViceDesk-2.2.6-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.6.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.6
+- **Android long-form had no voice-over** ("free voice unavailable here (No module named 'edge_tts')"). The free Microsoft voice is now included in the Android app.
+- **New: the phone's own voice.** If the Microsoft voice can't be reached, Android uses the phone's built-in text-to-speech instead: offline, free, no key. You can also pick **Phone's built-in voice** directly under Voice. For a nicer voice, install or update *Speech Recognition & Synthesis by Google* and choose a voice in Android Settings → Text-to-speech.
 
 ### Fixed in 2.2.5
 - **Long-form "Official footage" looked stuck** (e.g. "475.4 KB of 475.4 KB (file 3)"). YouTube sends video in many small pieces; progress now shows "piece 12 of 180" and the file counter only moves on when a whole file is finished.

@@ -70,6 +70,7 @@ chaquopy {
             install("certifi")
             install("numpy")
             install("pysubs2")
+            install("edge-tts")     // the free Microsoft voice (aiohttp and friends install as pure-Python wheels)
         }
     }
     sourceSets {

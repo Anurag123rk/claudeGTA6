@@ -198,6 +198,62 @@ def tts_free(text, path):
     asyncio.run(edge_tts.Communicate(text, "en-US-AndrewNeural").save(str(path)))
 
 
+def on_android():
+    import importlib.util
+    try:
+        return importlib.util.find_spec("com.chaquo.python") is not None
+    except Exception:
+        return False
+
+
+def tts_phone(text, path):
+    """The phone's built-in text-to-speech: offline and free. Long text goes in sentence chunks, joined by ffmpeg."""
+    from java import jclass
+    from com.chaquo.python import Python
+    app, S = Python.getPlatform().getApplication(), jclass("com.claudegta6.vicedesk.Speech")
+    limit = max(500, min(3000, int(S.maxChars()) - 100))
+    chunks, cur = [], ""
+    for s in re.split(r"(?<=[.!?])\s+", text.strip()):
+        while len(s) > limit:  # one very long sentence
+            chunks.append(s[:limit]); s = s[limit:]
+        if cur and len(cur) + len(s) + 1 > limit:
+            chunks.append(cur); cur = ""
+        cur = (cur + " " + s).strip()
+    if cur:
+        chunks.append(cur)
+    wavs = []
+    try:
+        for i, c in enumerate(chunks):
+            w = path.with_name(f"{path.stem}.{i}.wav")
+            err = str(S.synth(app, c, str(w)) or "")
+            if err:
+                raise RuntimeError(err)
+            wavs.append(w)
+        args = [tool("ffmpeg"), "-y", "-v", "error"]
+        for w in wavs:
+            args += ["-i", str(w)]
+        run(args + ["-filter_complex", f"concat=n={len(wavs)}:v=0:a=1", "-ar", "44100", "-b:a", "160k", str(path)])
+    finally:
+        for w in wavs:
+            w.unlink(missing_ok=True)
+
+
+def tts_offline(text, path):
+    """Free voice: Microsoft's (needs internet), else the phone's own voice on Android."""
+    try:
+        tts_free(text, path)
+        return
+    except Exception as e:
+        path.unlink(missing_ok=True)
+        if not on_android():
+            raise
+        first = e
+    try:
+        tts_phone(text, path)
+    except Exception as e:
+        raise RuntimeError(f"Microsoft voice: {str(first)[:80]}; phone voice: {str(e)[:120]}")
+
+
 def voice(d, script, mode):
     cfg = ai().load()
     key, vid = cfg.get("eleven_key"), cfg.get("voice_id")
@@ -215,7 +271,7 @@ def voice(d, script, mode):
                     raise
             else:
                 try:
-                    tts_free(text, p)
+                    tts_phone(text, p) if mode == "phone" else tts_offline(text, p)
                 except Exception as e:
                     p.unlink(missing_ok=True)  # never keep a half-written file
                     say(f"free voice unavailable here ({str(e)[:80]}): building without voice-over")
@@ -351,7 +407,7 @@ def main():
     ap.add_argument("--project", required=True); ap.add_argument("--topic", default="")
     ap.add_argument("--topics", default="map guides, mission walkthroughs, hidden locations, lore")
     ap.add_argument("--idea", choices=["outliers", "own"], default="outliers"); ap.add_argument("--minutes", type=float, default=8)
-    ap.add_argument("--footage", default=""); ap.add_argument("--voice", choices=["auto", "elevenlabs", "free", "none"], default="auto")
+    ap.add_argument("--footage", default=""); ap.add_argument("--voice", choices=["auto", "elevenlabs", "free", "phone", "none"], default="auto")
     ap.add_argument("--fresh", action="store_true", help="start a new run instead of resuming the last one")
     a = ap.parse_args()
     d = Path(a.project)

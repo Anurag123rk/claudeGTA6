@@ -266,6 +266,8 @@ jobs:
           if [ -n "$IMY" ]; then
             for z in $IMY; do unzip -l "$z" 2>/dev/null; done | grep -q "yt_dlp_ejs/" || { echo "yt-dlp-ejs missing from the APK"; exit 1; }
             echo "yt-dlp-ejs present"
+            for z in $IMY; do unzip -l "$z" 2>/dev/null; done | grep -q "edge_tts/" || { echo "edge-tts missing from the APK"; exit 1; }
+            echo "edge-tts present"
           else
             echo "::warning::could not find Chaquopy package archives to verify yt-dlp-ejs"
           fi
