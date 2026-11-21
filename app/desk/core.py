@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -223,6 +223,13 @@ def tool_status():
     try:
         import yt_dlp.version
         out["yt-dlp"] = {"ok": True, "path": "bundled " + yt_dlp.version.__version__}
+        try:
+            import importlib.util
+            ejs = importlib.util.find_spec("yt_dlp_ejs") is not None
+        except Exception:
+            ejs = False
+        out["youtube-solver"] = {"ok": ejs, "path": "yt-dlp-ejs: solves YouTube's JavaScript check" if ejs
+                                 else "missing: YouTube will hide every format (update the app)"}
     except Exception:
         p = shutil.which("yt-dlp")
         out["yt-dlp"] = {"ok": bool(p), "path": p or ""}

@@ -65,6 +65,7 @@ chaquopy {
         version = "3.12"
         pip {
             install("yt-dlp")
+            install("yt-dlp-ejs")   // YouTube challenge solver scripts: without them YouTube hides every format
             install("requests")
             install("certifi")
             install("numpy")

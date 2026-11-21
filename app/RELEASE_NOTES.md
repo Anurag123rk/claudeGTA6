@@ -1,11 +1,16 @@
-## Vice Desk 2.2.0: Windows, macOS, Linux and Android
+## Vice Desk 2.2.1: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.0-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.0-linux-x86_64` | `chmod +x ViceDesk-2.2.0-linux-x86_64 && ./ViceDesk-2.2.0-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.0.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.1-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.1-linux-x86_64` | `chmod +x ViceDesk-2.2.1-linux-x86_64 && ./ViceDesk-2.2.1-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.1.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.1 (Android)
+- **"Requested format is not available" on YouTube videos.** The phone app was missing yt-dlp's YouTube challenge solver (yt-dlp-ejs). Without it, YouTube hides every downloadable format. It's included now, and the build refuses to publish an APK without it.
+- The Setup card shows **YouTube challenge solver: ready**, so a missing solver is visible straight away.
+- This error is no longer retried pointlessly; it explains what to check instead (solver, sign-in, region lock).
 
 ### New in 2.2.0
 - **Pick your AI for long-form guides: Claude, ChatGPT, Gemini, OpenRouter, or a local model** (any OpenAI-compatible server, such as Ollama on your PC). Open **Long-form → AI model**, choose a provider, then:

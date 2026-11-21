@@ -259,6 +259,16 @@ jobs:
           unzip -l "$APK" | grep -E "lib/arm64-v8a/lib(ffmpeg|ffprobe|qjs).so|bundle/scripts/moments.py|bundle/scripts/fonts/Inter-Black.otf|bundle/ui/index.html"
           unzip -l "$APK" | grep -q "bundle/scripts/fonts/Inter-Black.otf" || { echo "fonts missing from APK"; exit 1; }
           for f in libffmpeg.so libffprobe.so libffmpeg.zip.so libffdeps.zip.so libqjs.so; do unzip -l "$APK" | grep -q "lib/arm64-v8a/$f" || { echo "missing $f"; exit 1; }; done
+          # the YouTube challenge solver must be inside the app's Python packages
+          mkdir -p apkx && unzip -o -q "$APK" 'assets/chaquopy/*' -d apkx
+          ls -la apkx/assets/chaquopy/ || true
+          IMY=$(ls apkx/assets/chaquopy/*.imy 2>/dev/null || true)
+          if [ -n "$IMY" ]; then
+            for z in $IMY; do unzip -l "$z" 2>/dev/null; done | grep -q "yt_dlp_ejs/" || { echo "yt-dlp-ejs missing from the APK"; exit 1; }
+            echo "yt-dlp-ejs present"
+          else
+            echo "::warning::could not find Chaquopy package archives to verify yt-dlp-ejs"
+          fi
           mkdir -p out && cp "$APK" out/ViceDesk.apk && ls -la out
 
       - uses: actions/upload-artifact@v4

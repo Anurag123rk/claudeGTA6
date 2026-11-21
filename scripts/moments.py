@@ -10,7 +10,7 @@ import argparse, json, math, os, re, sys, wave
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
-from common import COOKIE_HELP, ffprobe, is_bot_check, is_url, job_dir, load_json, media_ok, progress, retry, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
+from common import COOKIE_HELP, NO_FORMATS_HELP, ffprobe, is_bot_check, is_url, job_dir, load_json, media_ok, progress, retry, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
 
 HYPE = re.compile(r"\b(no way|oh my god|omg|what|wait|bro|let'?s go|holy|insane|crazy|yo+|wtf|dude|look at|nah|run|go go)\b", re.I)
 CHAT_HYPE = re.compile(r"(LMAO|LOL|KEKW|OMEGALUL|W+\b|CLIP|💀|😂|🔥|NO WAY|HOLY)", re.I)
@@ -48,6 +48,8 @@ def fetch(src, d, max_min):
             except SystemExit as e:
                 if is_bot_check(str(e.code)):
                     sys.exit(COOKIE_HELP)
+                if "format is not available" in str(e.code):
+                    sys.exit(NO_FORMATS_HELP)
                 raise
             if not media_ok(tmp):
                 tmp.unlink(missing_ok=True)

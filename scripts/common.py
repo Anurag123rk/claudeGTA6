@@ -100,6 +100,10 @@ def ytdl_opts(**extra):
 BOT_CHECK = ("confirm you're not a bot", "confirm you’re not a bot", "sign in to confirm")
 
 
+NO_FORMATS_HELP = ("YouTube offered no playable formats for this video [no-formats]. Usually its JavaScript check was "
+                   "not solved: check Dashboard > Setup shows the YouTube challenge solver as ready (update the app if not). "
+                   "If it does, the video may need sign-in (Settings > YouTube sign-in) or be region-locked; then press Retry.")
+
 COOKIE_HELP = ("YouTube asked to confirm you're not a bot [needs-cookies]. Add YouTube cookies: in Vice Desk open "
                "Settings > YouTube sign-in (phone: Sign in to YouTube; desktop: use your browser or paste cookies.txt), "
                "then press Retry.")
@@ -241,8 +245,8 @@ def retry(fn, what, attempts=3, wait=5):
             return fn()
         except (SystemExit, Exception) as e:  # yt-dlp failures surface as SystemExit (ytdl_download) or exceptions
             msg = str(e.code if isinstance(e, SystemExit) else e)
-            if msg == "cancelled" or k == attempts or is_bot_check(msg):
-                raise
+            if msg == "cancelled" or k == attempts or is_bot_check(msg) or "format is not available" in msg:
+                raise  # retrying cannot fix these
             print(f"{what} failed ({msg[:160]}); retrying in {wait * k}s ({k}/{attempts - 1})", flush=True)
             for _ in range(wait * k):
                 check_cancel()
