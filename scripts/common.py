@@ -214,6 +214,11 @@ def run_ffmpeg(cmd, duration, label="encoded"):
         if p.poll() is None and CANCEL_CHECK is not None and CANCEL_CHECK():
             p.kill()
     p.wait(); t.join(2)
+    for pipe in (p.stdout, p.stderr):  # close them: unclosed pipes print ResourceWarnings into the log
+        try:
+            pipe.close()
+        except Exception:
+            pass
     if p.returncode != 0:
         sys.exit(f"command failed ({p.returncode}): {' '.join(map(str, cmd))[:200]}\n{''.join(err)[-1500:]}")
     progress(duration, duration, label)

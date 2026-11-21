@@ -124,8 +124,9 @@ function taskCard(t, opts = {}) {
   if (t.state === "done" && t.result) {
     const r = t.result, b = [];
     if (r.job) b.push(`<button class="sm" data-showjob="${esc(r.job)}">View candidates</button>`, `<button class="sm" data-open="${esc(r.job)}">Open folder</button>`);
-    (r.clips || []).forEach((c) => b.push(`<button class="sm" data-play="${esc(c)}" data-name="${esc(c.split(/[\\/]/).pop())}">▶ ${esc(c.split(/[\\/]/).pop())}</button>`));
-    (r.checks || []).forEach((c) => b.push(`<span class="badge ${c.pass ? "done" : "failed"}" title="${esc((c.lines || []).join("\n"))}">${c.pass ? "PASS" : "FAIL"} ${esc(c.clip.split(/[\\/]/).pop())}</span>`));
+    const label = (c) => { const m = c.match(/clip_(\d+)\.mp4$/); return m ? `moment #${m[1]}` : c.split(/[\\/]/).pop(); };
+    (r.clips || []).forEach((c, i) => b.push(`<button class="sm" data-play="${esc(c)}" data-name="Clip ${i + 1} · ${esc(label(c))}">▶ Clip ${i + 1}</button>`));
+    (r.checks || []).forEach((c, i) => b.push(`<span class="badge ${c.pass ? "done" : "failed"}" title="${esc((c.lines || []).join("\n"))}">Clip ${i + 1} ${c.pass ? "PASS" : "FAIL"}</span>`));
     if (r.file) b.push(`<button class="sm" data-showfind="${t.kind}">Show results</button>`);
     if (r.draft) b.push(`<button class="sm primary" data-play="${esc(r.draft)}" data-name="Draft">▶ Watch the draft</button>`, AND
       ? `<button class="sm" data-share="${esc(r.draft)}">Share</button>` : `<button class="sm" data-open="${esc(r.publish || r.project)}">Open publish pack</button>`);
@@ -429,8 +430,13 @@ $("#liveForm").addEventListener("submit", (e) => { e.preventDefault(); run("live
 
 // ---------------------------------------------------------------- library
 function clipCard(c) {
-  return `<div class="clip"><video preload="metadata" muted src="${fileUrl(c.file)}#t=0.5" data-play="${esc(c.file)}" data-name="${esc(c.name)}"></video>
-    <div class="ci"><b>${esc(c.name)}</b><span class="muted">${fmtBytes(c.size)}${c.layout ? " · " + esc(c.layout) : ""}</span>${c.hook ? `<br>${esc(c.hook)}` : ""}
+  const v = Math.round(c.mtime || 0);
+  const fresh = c.mtime && Date.now() / 1000 - c.mtime < 15 * 60;
+  const span = c.start != null && c.end != null ? `${fmtT(c.start)}–${fmtT(c.end)}` : "";
+  const label = c.moment != null ? `Moment #${c.moment}` : esc(c.name);
+  return `<div class="clip"><video preload="metadata" muted src="${fileUrl(c.file)}&v=${v}#t=0.5" data-play="${esc(c.file)}" data-name="${label}"></video>
+    <div class="ci"><b>${label}${fresh ? ' <span class="badge done">new</span>' : ""}</b><span class="muted">${span}${span ? " · " : ""}${fmtBytes(c.size)}${c.layout ? " · " + esc(c.layout) : ""}</span>${c.hook ? `<br>${esc(c.hook)}` : ""}
+    <span class="muted small">${new Date((c.mtime || 0) * 1000).toLocaleString()}</span>
     <div class="acts" style="margin-top:6px;flex-wrap:wrap"><button class="sm" data-check="${esc(c.file)}">Check</button>${AND
       ? `<button class="sm primary" data-share="${esc(c.file)}">Share</button><button class="sm" data-save="${esc(c.file)}">Save</button>`
       : `<button class="sm" data-open="${esc(c.file)}">Open</button>`}</div></div></div>`;
@@ -459,7 +465,7 @@ document.addEventListener("click", (e) => {
 });
 function play(file, name) {
   const d = $("#player"); $("#playerTitle").textContent = name || ""; const v = $("#video");
-  v.src = fileUrl(file); d.showModal(); v.play().catch(() => {});
+  v.src = fileUrl(file) + "&v=" + Date.now(); d.showModal(); v.play().catch(() => {});  // never a cached older cut
 }
 $("#closePlayer").addEventListener("click", () => { const v = $("#video"); v.pause(); v.removeAttribute("src"); v.load(); $("#player").close(); });
 

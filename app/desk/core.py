@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.2.1"
+VERSION = "2.2.2"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -1014,8 +1014,13 @@ def list_jobs():
                 meta = json.loads(f.with_suffix(".json").read_text(encoding="utf-8"))
             except Exception:
                 pass
-            j["clips"].append({"file": str(f), "name": f.name, "size": f.stat().st_size, "hook": meta.get("hook", ""),
-                               "layout": meta.get("layout", ""), "start": meta.get("start"), "end": meta.get("end")})
+            st = f.stat()
+            m_ = re.match(r"clip_(\d+)\.mp4$", f.name)
+            j["clips"].append({"file": str(f), "name": f.name, "size": st.st_size, "mtime": st.st_mtime,
+                               "moment": int(m_.group(1)) if m_ else None, "hook": meta.get("hook", ""),
+                               "layout": meta.get("layout", ""), "platform": meta.get("platform", ""),
+                               "start": meta.get("start"), "end": meta.get("end")})
+        j["clips"].sort(key=lambda c: -c["mtime"])  # newest first
         if (d / "live").exists():
             j["live"] = [{"file": str(f), "name": f.name, "size": f.stat().st_size} for f in sorted((d / "live").glob("spike_*.mp4"))]
         out.append(j)

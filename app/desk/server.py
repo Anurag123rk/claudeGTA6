@@ -94,6 +94,7 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         self.send_header("Content-Type", ctype)
         self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Cache-Control", "no-store")  # re-cut clips keep their file name: never show a cached old one
         self.send_header("Content-Length", str(end - start + 1))
         self.end_headers()
         with open(f, "rb") as fh:

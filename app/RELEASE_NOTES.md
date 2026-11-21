@@ -1,11 +1,16 @@
-## Vice Desk 2.2.1: Windows, macOS, Linux and Android
+## Vice Desk 2.2.2: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.1-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.1-linux-x86_64` | `chmod +x ViceDesk-2.2.1-linux-x86_64 && ./ViceDesk-2.2.1-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.1.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.2-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.2-linux-x86_64` | `chmod +x ViceDesk-2.2.2-linux-x86_64 && ./ViceDesk-2.2.2-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.2.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.2
+- **New clips showed the previous output.** Re-cut clips keep their file name, and the app's web view kept showing the cached older video. Clip previews and the player now always load the newest file.
+- **Clearer clip names.** A finished pipeline lists **Clip 1, Clip 2…** in order. The library shows each clip's moment, time range and creation time, newest first, with a **new** badge on fresh clips.
+- The log no longer fills with "ResourceWarning: unclosed file" after encoding.
 
 ### Fixed in 2.2.1 (Android)
 - **"Requested format is not available" on YouTube videos.** The phone app was missing yt-dlp's YouTube challenge solver (yt-dlp-ejs). Without it, YouTube hides every downloadable format. It's included now, and the build refuses to publish an APK without it.
