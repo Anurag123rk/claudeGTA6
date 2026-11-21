@@ -134,6 +134,14 @@ def ytdl_info(url):
         return ydl.sanitize_info(ydl.extract_info(url, download=False, process=False))
 
 
+def is_video_url(u):
+    """A single video link (not a channel, playlist or search page)."""
+    u = (u or "").lower()
+    if "youtube.com" in u or "youtu.be" in u:
+        return bool(re.search(r"(watch\?(.*&)?v=|youtu\.be/|/shorts/|/live/)[\w-]{6,}", u))
+    return True
+
+
 def ytdl_download(url, out, fmt, max_seconds=None):
     """Download url to out (mp4), printing [VPROG] lines. Raises SystemExit with a readable message on failure."""
     import yt_dlp
@@ -147,7 +155,8 @@ def ytdl_download(url, out, fmt, max_seconds=None):
                   f"{n('eta')}|{frag.replace(' ', '_') if d.get('status') == 'downloading' else d.get('status')}", flush=True)
 
     opts = ytdl_opts(format=fmt, outtmpl=str(out), merge_output_format="mp4", progress_hooks=[hook],
-                     concurrent_fragment_downloads=4, noprogress=True)
+                     concurrent_fragment_downloads=4, noprogress=True,
+                     noplaylist=True, playlist_items="1")  # one video, never a whole channel or playlist
     if max_seconds:
         from yt_dlp.utils import download_range_func
         opts["download_ranges"] = download_range_func([], [[0, max_seconds]])

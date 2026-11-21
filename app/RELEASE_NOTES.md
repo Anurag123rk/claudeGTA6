@@ -1,11 +1,15 @@
-## Vice Desk 2.2.6: Windows, macOS, Linux and Android
+## Vice Desk 2.2.7: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.6-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.6-linux-x86_64` | `chmod +x ViceDesk-2.2.6-linux-x86_64 && ./ViceDesk-2.2.6-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.6.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.7-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.7-linux-x86_64` | `chmod +x ViceDesk-2.2.7-linux-x86_64 && ./ViceDesk-2.2.7-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.7.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.7
+- **Long-form footage got stuck on "official video 2 of 2"** with the bar refilling over and over. The search picked up Rockstar's *channel* link as a video and started downloading the whole channel. Only real video links are used now, channel/playlist links you paste are skipped with a note, and a download never pulls more than one video.
+- **No voice-over on Android** ("No audio was received"). When the Microsoft voice fails, it now tries a second Microsoft voice and then really falls back to the phone's built-in voice (the 2.2.6 fallback didn't recognise it was on Android).
 
 ### Fixed in 2.2.6
 - **Android long-form had no voice-over** ("free voice unavailable here (No module named 'edge_tts')"). The free Microsoft voice is now included in the Android app.

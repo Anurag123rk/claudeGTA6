@@ -4,12 +4,12 @@ VSVersionInfo(
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', 'claudeGTA6'),
       StringStruct('FileDescription', 'Vice Desk - GTA 6 clip pipeline'),
-      StringStruct('FileVersion', '2.2.6'),
+      StringStruct('FileVersion', '2.2.7'),
       StringStruct('InternalName', 'ViceDesk'),
       StringStruct('LegalCopyright', 'MIT License'),
       StringStruct('OriginalFilename', 'ViceDesk.exe'),
       StringStruct('ProductName', 'Vice Desk'),
-      StringStruct('ProductVersion', '2.2.6')])]),
+      StringStruct('ProductVersion', '2.2.7')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
 )

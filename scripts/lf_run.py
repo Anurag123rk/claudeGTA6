@@ -17,7 +17,7 @@ import argparse, json, os, re, statistics, sys, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import media_ok, progress, run, stage, tool, ytdl_download, ytdl_search  # noqa: E402
+from common import is_video_url, media_ok, progress, run, stage, tool, ytdl_download, ytdl_search  # noqa: E402
 
 N = 8  # stages
 
@@ -195,13 +195,25 @@ def tts_eleven(text, path, key, voice_id):
 
 def tts_free(text, path):
     import asyncio, edge_tts
-    asyncio.run(edge_tts.Communicate(text, "en-US-AndrewNeural").save(str(path)))
+    text = re.sub(r"[<>&*_#`|~\[\]{}]", " ", text)  # markup the speech service may choke on
+    text = re.sub(r"\s+", " ", text).strip()
+    err = None
+    for v in ("en-US-AndrewNeural", "en-US-GuyNeural"):
+        try:
+            asyncio.run(edge_tts.Communicate(text, v).save(str(path)))
+            if path.exists() and path.stat().st_size > 1000:
+                return
+        except Exception as e:
+            err = e
+        path.unlink(missing_ok=True)
+    raise err or RuntimeError("no audio from the Microsoft voice")
 
 
 def on_android():
-    import importlib.util
     try:
-        return importlib.util.find_spec("com.chaquo.python") is not None
+        from java import jclass
+        jclass("com.claudegta6.vicedesk.Speech")
+        return True
     except Exception:
         return False
 
@@ -297,10 +309,17 @@ def footage(d, urls, need_seconds=480):
     if not urls:  # official only: Rockstar Games' own channel
         say("finding official Rockstar Games videos")
         res = ytdl_search("https://www.youtube.com/results?search_query=grand+theft+auto+vi+trailer+rockstar+games", 15)
-        urls = [e["url"] for e in res if (e.get("channel") or "").lower().strip() == "rockstar games"][:2]
+        urls = [e["url"] for e in res if (e.get("channel") or "").lower().strip() == "rockstar games"
+                and is_video_url(e.get("url")) and (e.get("duration") or 61) > 60
+                and e.get("live_status") not in ("is_live", "is_upcoming")][:2]
         if not urls:
             sys.exit("no official footage found: paste official trailer/gameplay URLs in the Long-form form")
-    urls = urls[:4]
+    bad = [u for u in urls if not is_video_url(u)]
+    if bad:
+        say("skipping links that are not single videos (channel or playlist pages): " + ", ".join(bad))
+    urls = [u for u in urls if is_video_url(u)][:4]
+    if not urls:
+        sys.exit("no single-video links for footage: paste official trailer/gameplay video URLs (youtube.com/watch?v=...)")
     # each source is reused across chapters: about the narration length split across sources, plus a margin
     per = int(min(600, max(90, need_seconds / len(urls) + 45)))
     h = int(os.environ.get("VICE_MAX_HEIGHT") or 1080)  # 720 on phones: lighter and less often refused
