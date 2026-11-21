@@ -68,6 +68,7 @@ chaquopy {
             install("requests")
             install("certifi")
             install("numpy")
+            install("pysubs2")
         }
     }
     sourceSets {

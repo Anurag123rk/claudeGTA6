@@ -5,6 +5,8 @@ loudness normalised to -14 LUFS. Writes jobs/<id>/edits/clip_<n>.mp4 + .json (me
 
 usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|facecam|react] [--hook "TEXT"]
                      [--cam auto|x:y:w:h] [--title "TEXT" --title-style box|outline --title-secs 0] [--captions word|bubble|none]
+                     [--punch 0.15] [--clean-audio] [--fps 30|60]
+Also writes clip_<n>.srt and clip_<n>.ass next to the clip, for finishing touches in Kdenlive, Shotcut or OpenCut.
 """
 import argparse, sys
 from pathlib import Path
@@ -51,6 +53,37 @@ def wrap(text, width):
     return lines + ([cur] if cur else [])
 
 
+def caption_groups(words, s0, e0, profanity=False):
+    """Words of [s0, e0) in groups of up to 3, broken on punctuation or pauses (shared by .ass and .srt)."""
+    ws = [dict(w, w=clean(w["w"], profanity)) for w in words if s0 <= w["s"] < e0 and w["w"]]
+    groups, cur = [], []
+    for w in ws:
+        if cur and (len(cur) == 3 or w["s"] - cur[-1]["e"] > 0.6 or cur[-1]["w"][-1:] in ".?!,"):
+            groups.append(cur); cur = []
+        cur.append(w)
+    if cur:
+        groups.append(cur)
+    return groups
+
+
+def export_subs(groups, s0, hook, base):
+    """Editable subtitles for desktop editors: <base>.srt (plain) and <base>.ass (styled, rendered by libass)."""
+    try:
+        import pysubs2
+    except ImportError:
+        print("pysubs2 not installed: skipping .srt export")
+        return
+    subs = pysubs2.SSAFile()
+    if hook:
+        subs.append(pysubs2.SSAEvent(start=0, end=2600, text=hook))
+    for gi, g in enumerate(groups):
+        end = groups[gi + 1][0]["s"] if gi + 1 < len(groups) else g[-1]["e"] + 0.4
+        end = min(end, g[-1]["e"] + 0.8)
+        subs.append(pysubs2.SSAEvent(start=int((g[0]["s"] - s0) * 1000), end=int((end - s0) * 1000),
+                                     text=" ".join(x["w"] for x in g)))
+    subs.save(str(base.with_suffix(".srt")))
+
+
 def build_ass(words, s0, e0, hook, cap_y, title=None, caps='word', profanity=False):
     hdr = f"""[Script Info]
 ScriptType: v4.00+
@@ -70,15 +103,7 @@ Style: Bubble,Arial,58,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     ev = []
-    ws = [dict(w, w=clean(w["w"], profanity)) for w in words if s0 <= w["s"] < e0 and w["w"]]
-    # groups of up to 3 words, break on punctuation or pauses
-    groups, cur = [], []
-    for w in ws:
-        if cur and (len(cur) == 3 or w["s"] - cur[-1]["e"] > 0.6 or cur[-1]["w"][-1:] in ".?!,"):
-            groups.append(cur); cur = []
-        cur.append(w)
-    if cur:
-        groups.append(cur)
+    groups = caption_groups(words, s0, e0, profanity)
     hook_end = 2.6 if hook else 0
     for gi, g in enumerate(groups):
         g_end = groups[gi + 1][0]["s"] if gi + 1 < len(groups) else g[-1]["e"] + 0.4
@@ -123,7 +148,13 @@ def even(n):
     return int(n) // 2 * 2
 
 
-def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None):
+def punch_filter(a, b, z):
+    """Zoom in by z (0.15 = 15%) between clip times a and b with short eases: the 'punch in' on the reaction."""
+    e = f"(1+{z:.3f}*min(1,max(0,(t-{a:.2f})/0.18))*min(1,max(0,({b:.2f}-t)/0.35)))"
+    return f"scale=w='trunc(iw*{e}/2)*2':h='trunc(ih*{e}/2)*2':eval=frame,crop={W}:{H},"
+
+
+def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x=None, face_expr=None, punch=None, fps=30):
     """Layout + burned-caption filter graph ending in [vo]. Reused by translate.py."""
     if layout == "fill":
         v = f"[0:v]scale=-2:{H},crop={W}:{H}[v]"
@@ -152,7 +183,10 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{int(H * 0.38)}:force_original_aspect_ratio=increase,"
              f"crop={W}:{int(H * 0.38)}[cam];[b]scale=-2:{H - int(H * 0.38)},crop={W}:{H - int(H * 0.38)}[game];[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
-    return v + f";[v]fps=30,subtitles='{sub}'[vo]"
+    zoom = punch_filter(*punch) if punch else ""
+    # 60 fps: motion-compensated interpolation (a CPU stand-in for RIFE); slow, so it is opt-in
+    rate = "fps=30" if fps != 60 else "minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
+    return v + f";[v]{zoom}{rate},subtitles='{sub}'[vo]"
 
 
 def game_offset(video, s0, e0, src, cam_box):
@@ -208,6 +242,9 @@ def main():
     ap.add_argument("--allow-profanity", action="store_true", help="keep swear words in captions (slurs are always masked)")
     ap.add_argument("--cam", default="auto", help="auto (find the webcam) or x:y:w:h fractions")
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
+    ap.add_argument("--punch", type=float, default=0, help="zoom in this much on the peak moment, e.g. 0.15 (0 = off)")
+    ap.add_argument("--clean-audio", action="store_true", help="reduce mic/background noise before loudness normalising")
+    ap.add_argument("--fps", type=int, choices=[30, 60], default=30, help="60 = smooth motion interpolation (slow)")
     a = ap.parse_args()
     d = Path(a.job); c = load_json(d / "candidates.json")
     stage(1, 2, f"Preparing clip {a.pick}")
@@ -277,15 +314,26 @@ def main():
         vs = [x for x in ffprobe(c['source'])['streams'] if x.get('codec_type') == 'video'][0]
         src = (int(vs['width']), int(vs['height']))
         gx = game_offset(c['source'], s0, e0, src, [float(t) for t in cam.split(':')])
-    v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr)
+    punch = None
+    if a.punch > 0:
+        peak = float(pick.get("peak", (s0 + e0) / 2)) - s0
+        peak = min(max(peak, 0.5), max(0.5, e0 - s0 - 1.0))
+        punch = (max(0.0, peak - 0.4), min(e0 - s0, peak + 1.8), min(a.punch, 0.4))
+        print(f"punch-in at {peak:.1f}s (+{punch[2] * 100:.0f}%)")
+    v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr,
+                     punch=punch, fps=a.fps)
+    af = ("highpass=f=80,afftdn=nr=12:nf=-30," if a.clean_audio else "") + "loudnorm=I=-14:TP=-1.5:LRA=11"
     mp4 = out / f"clip_{a.pick}.mp4"
     stage(2, 2, f"Encoding clip {a.pick}")
     run_ffmpeg([tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
-         "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+         "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", af,
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
          "-ar", "48000", "-movflags", "+faststart", str(mp4)], e0 - s0)
+    if cap_words or a.hook:
+        export_subs(caption_groups(cap_words, s0, e0, a.allow_profanity), s0, a.hook, out / f"clip_{a.pick}")
     info = c.get("info", {})
-    save_json(out / f"clip_{a.pick}.json", {"file": str(mp4), "start": s0, "end": e0, "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
+    save_json(out / f"clip_{a.pick}.json", {"file": str(mp4), "start": s0, "end": e0, "layout": layout,
+                                            "punch": a.punch, "clean_audio": a.clean_audio, "fps": a.fps, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)

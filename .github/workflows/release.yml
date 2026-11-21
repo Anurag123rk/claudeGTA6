@@ -1,4 +1,4 @@
-name: Build Vice Desk (Windows .exe + Android .apk)
+name: Build Vice Desk (Windows, macOS, Linux, Android)
 
 on:
   push:
@@ -101,6 +101,83 @@ jobs:
           if-no-files-found: error
 
 
+  desktop-unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14          # Apple silicon
+            tag: mac-arm64
+            ff: darwin-arm64
+          - os: ubuntu-22.04      # older glibc = runs on more distros
+            tag: linux-x86_64
+            ff: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r app/requirements-app.txt
+
+      - name: Bundle ffmpeg, ffprobe and Deno
+        run: |
+          set -e
+          mkdir -p app/vendor/bin
+          curl -fsSL -o app/vendor/bin/ffmpeg  https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-${{ matrix.ff }}
+          curl -fsSL -o app/vendor/bin/ffprobe https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffprobe-${{ matrix.ff }}
+          cp "$(python -c 'import deno; print(deno.find_deno_bin())')" app/vendor/bin/deno
+          chmod +x app/vendor/bin/*
+          if [ "$RUNNER_OS" = "macOS" ]; then codesign --force -s - app/vendor/bin/*; fi
+          app/vendor/bin/ffmpeg -version | head -1
+          app/vendor/bin/deno --version | head -1
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('app/desk/core.py').read()).group(1))")" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        working-directory: app
+        env:
+          VICE_VERSION: ${{ steps.ver.outputs.version }}
+        run: pyinstaller --noconfirm --clean vicedesk.spec
+
+      - name: Smoke test
+        run: |
+          set -e
+          if [ "$RUNNER_OS" = "macOS" ]; then BIN="app/dist/Vice Desk.app/Contents/MacOS/ViceDesk"; else BIN=app/dist/ViceDesk; fi
+          "$BIN" -m yt_dlp --version
+          "$BIN" --script check.py --help | grep -q "usage: check.py"
+          "$BIN" --script cut.py --help | grep -q "punch"
+          BROWSER=true "$BIN" --browser --port 8765 > gui.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8765/ > page.html && break; sleep 1; done
+          TOK=$(grep -o 'DESK_TOKEN = "[^"]*"' page.html | cut -d'"' -f2)
+          curl -fs -H "X-Desk-Token: $TOK" http://127.0.0.1:8765/api/status | tee status.json
+          python -c "import json; s=json.load(open('status.json')); t=s['tools']; assert t['ffmpeg']['ok'] and t['yt-dlp']['ok'], t; print('ffmpeg:', t['ffmpeg']['path'])"
+          kill %1 || true
+
+      - name: Package
+        run: |
+          set -e
+          mkdir -p out
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            hdiutil create -volname "Vice Desk" -srcfolder "app/dist/Vice Desk.app" -ov -format UDZO "out/ViceDesk-${{ steps.ver.outputs.version }}-${{ matrix.tag }}.dmg"
+          else
+            cp app/dist/ViceDesk "out/ViceDesk-${{ steps.ver.outputs.version }}-${{ matrix.tag }}"
+          fi
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.tag }}
+          path: out/*
+          if-no-files-found: error
+
   android:
     runs-on: ubuntu-latest
     steps:
@@ -156,7 +233,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [windows, android]
+    needs: [windows, desktop-unix, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -180,10 +257,12 @@ jobs:
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           target_commitish: ${{ github.sha }}
-          name: Vice Desk ${{ steps.ver.outputs.version }} (Windows + Android)
+          name: Vice Desk ${{ steps.ver.outputs.version }} (Windows, macOS, Linux, Android)
           body_path: app/RELEASE_NOTES.md
           files: |
             dist/ViceDesk.exe
             dist/ViceDesk-${{ steps.ver.outputs.version }}.apk
+            dist/ViceDesk-${{ steps.ver.outputs.version }}-mac-arm64.dmg
+            dist/ViceDesk-${{ steps.ver.outputs.version }}-linux-x86_64
           make_latest: true
           overwrite_files: true

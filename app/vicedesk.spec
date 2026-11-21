@@ -22,8 +22,9 @@ for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "tokenizers", "av", 
         datas += d; binaries += b; hiddenimports += h
     except Exception as e:
         print("skip", pkg, e)
-if sys.platform == "win32":
-    for pkg in ("webview", "clr_loader", "pythonnet"):
+GUI_PKGS = {"win32": ("webview", "clr_loader", "pythonnet"), "darwin": ("webview",)}.get(sys.platform, ())
+if GUI_PKGS:  # native window; Linux opens the default browser instead
+    for pkg in GUI_PKGS:
         try:
             d, b, h = collect_all(pkg)
             datas += d; binaries += b; hiddenimports += h
@@ -33,5 +34,13 @@ if sys.platform == "win32":
 a = Analysis([os.path.join(HERE, "vicedesk.py")], pathex=[HERE, SCRIPTS], binaries=binaries, datas=datas,
              hiddenimports=hiddenimports, excludes=["tkinter", "matplotlib", "IPython", "pytest", "torch"], noarchive=False)
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], name="ViceDesk", console=False, upx=False,
-          icon=os.path.join(HERE, "vicedesk.ico"), version=os.path.join(HERE, "version_info.txt") if sys.platform == "win32" else None)
+ICON = os.path.join(HERE, "vicedesk.ico")
+if sys.platform == "darwin":  # macOS: a real "Vice Desk.app" bundle (onedir inside), shipped in a .dmg
+    exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="ViceDesk", console=False, upx=False)
+    coll = COLLECT(exe, a.binaries, a.datas, name="ViceDesk", upx=False)
+    app = BUNDLE(coll, name="Vice Desk.app", icon=ICON, bundle_identifier="com.claudegta6.vicedesk",
+                 info_plist={"CFBundleShortVersionString": os.environ.get("VICE_VERSION", "2.0.0"),
+                             "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "12.0"})
+else:  # Windows .exe / Linux binary: one file
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], name="ViceDesk", console=False, upx=False, icon=ICON,
+              version=os.path.join(HERE, "version_info.txt") if sys.platform == "win32" else None)

@@ -342,7 +342,8 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-cut]"); if (!b) return;
   const lay = b.parentElement.querySelector("select");
   const f = formData($("#pipeForm"));
-  run("cut", { job: b.dataset.job, pick: b.dataset.cut, layout: lay ? lay.value : "blur", hook: f.hook, captions: f.captions, caption: f.caption }, "pipeTask");
+  run("cut", { job: b.dataset.job, pick: b.dataset.cut, layout: lay ? lay.value : "blur", hook: f.hook, captions: f.captions, caption: f.caption,
+    punch: f.punch, clean_audio: f.clean_audio, fps60: f.fps60 }, "pipeTask");
 });
 
 // ---------------------------------------------------------------- live

@@ -144,7 +144,7 @@ class MainActivity : Activity() {
     }
 
     /** Copy a finished clip into Movies/ViceDesk so the gallery, TikTok, Instagram etc. can see it. */
-    private fun saveToGallery(path: String): Uri {
+    private fun copyToGallery(path: String): Uri {
         val f = File(path)
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, "vicedesk_${System.currentTimeMillis() / 1000}_${f.name}")
@@ -188,7 +188,7 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun saveToGallery(path: String) {
             Thread {
-                try { saveToGallery(path); message("Saved to your gallery (Movies/ViceDesk)") }
+                try { copyToGallery(path); message("Saved to your gallery (Movies/ViceDesk)") }
                 catch (e: Exception) { message("Save failed: ${e.message}") }
             }.start()
         }
@@ -196,7 +196,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun shareFile(path: String) {
             Thread {
                 try {
-                    val uri = saveToGallery(path)
+                    val uri = copyToGallery(path)
                     val send = Intent(Intent.ACTION_SEND).apply {
                         type = "video/mp4"; putExtra(Intent.EXTRA_STREAM, uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

@@ -49,6 +49,10 @@
               <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             </div>
             <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
+            <div class="row studio">
+              <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom</span></label>
+              <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean audio</span></label>
+            </div>
             <div class="row end"><button type="button" class="android-only" data-pick="#quickForm">Pick video from phone</button><button class="primary" type="submit">Run full pipeline</button></div>
           </form>
         </div>
@@ -89,7 +93,7 @@
     <section class="page" id="page-pipeline">
       <h1>Pipeline</h1>
       <div class="stages">
-        <span>1 Download</span><span>2 Audio</span><span>3 Transcribe</span><span>4 Score moments</span><span>5 Cut clips</span><span>6 Rule check</span>
+        <span>1 Download</span><span>2 Transcribe</span><span>3 Find the reaction</span><span>4 Cut</span><span>5 Punch in</span><span>6 Caption</span><span>7 Rule check</span><span>8 Ship</span>
       </div>
       <div class="card">
         <form id="pipeForm" class="stack">
@@ -105,6 +109,11 @@
             <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
             <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             <label class="grow">Hook<input name="hook" maxlength="80" placeholder="optional on-screen opener"></label>
+          </div>
+          <div class="row studio">
+            <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom on the peak</span></label>
+            <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean noisy audio</span></label>
+            <label class="chk"><span><input type="checkbox" name="fps60"> Smooth 60 fps (slow)</span></label>
           </div>
           <label>Post caption (checked for banned words and campaign hashtags)<input name="caption" placeholder="#GTA6 credit @creator"></label>
           <div class="row end">

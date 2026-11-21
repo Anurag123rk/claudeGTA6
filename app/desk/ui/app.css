@@ -156,3 +156,4 @@ label.chk { flex: 0 0 auto; justify-content: flex-end; } label.chk span { displa
 .mono, .checks .muted, .card a { overflow-wrap: anywhere; }
 .toast { pointer-events: none; }
 body.android [data-open] { display: none !important; }
+.row.studio { gap: 4px 18px; } .row.studio label.chk { flex: 0 0 auto; } .row.studio label.chk span { padding-bottom: 0; }

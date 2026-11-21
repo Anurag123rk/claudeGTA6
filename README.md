@@ -21,7 +21,7 @@
 
 ## Vice Desk: Windows and Android apps (no Claude Code needed)
 
-**[Download from Releases](https://github.com/Anurag123rk/claudeGTA6/releases/latest)**: `ViceDesk.exe` for Windows (double-click it) or `ViceDesk-<version>.apk` for Android 10+ (open it on your phone and allow installing). No Python, no login, no cloud backend.
+**[Download from Releases](https://github.com/Anurag123rk/claudeGTA6/releases/latest)**: `ViceDesk.exe` for Windows, a `.dmg` for macOS (Apple silicon), a single binary for Linux, or `ViceDesk-<version>.apk` for Android 10+. No Python, no login, no cloud backend.
 
 The Android app runs the same pipeline on your phone (no captions there: the speech engine has no Android build). Share a YouTube/Twitch link to it, then share the finished clip straight to TikTok, Instagram or YouTube. It's built from [`android/`](android) with Chaquopy.
 

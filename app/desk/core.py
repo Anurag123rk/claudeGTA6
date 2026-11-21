@@ -649,6 +649,12 @@ def _cut_args(job, n, p):
         a += ["--start", p["start"]]
     if p.get("end") not in (None, ""):
         a += ["--end", p["end"]]
+    if p.get("punch"):
+        a += ["--punch", 0.15]
+    if p.get("clean_audio"):
+        a += ["--clean-audio"]
+    if p.get("fps60"):
+        a += ["--fps", 60]
     return a
 
 
