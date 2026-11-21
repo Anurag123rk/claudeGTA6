@@ -9,7 +9,7 @@ usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|facecam|react] [--ho
 import argparse, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from common import load_json, run, save_json, tool
+from common import load_json, run_ffmpeg, save_json, stage, tool
 
 W, H = 1080, 1920
 
@@ -210,9 +210,15 @@ def main():
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
     a = ap.parse_args()
     d = Path(a.job); c = load_json(d / "candidates.json")
-    pick = next(x for x in c["candidates"] if x["n"] == a.pick)
+    stage(1, 2, f"Preparing clip {a.pick}")
+    pick = next((x for x in c["candidates"] if x["n"] == a.pick), None)
+    if pick is None:
+        sys.exit(f"no candidate #{a.pick} in {d / 'candidates.json'} (have {[x['n'] for x in c['candidates']]})")
     s0 = a.start if a.start is not None else pick["start"]; e0 = a.end if a.end is not None else pick["end"]
-    words = load_json(d / "transcript.json")
+    tr = d / "transcript.json"
+    words = load_json(tr) if tr.exists() else []
+    if not words:
+        print("no transcript for this job: cutting without captions")
     out = d / "edits"; out.mkdir(exist_ok=True)
     layout, cam, side = a.layout, a.cam, 'right'
     face_expr = None
@@ -273,10 +279,11 @@ def main():
         gx = game_offset(c['source'], s0, e0, src, [float(t) for t in cam.split(':')])
     v = video_filter(layout, cam, ass, band=band, cam_side=side, src=src, game_x=gx, face_expr=face_expr)
     mp4 = out / f"clip_{a.pick}.mp4"
-    run([tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
+    stage(2, 2, f"Encoding clip {a.pick}")
+    run_ffmpeg([tool("ffmpeg"), "-y", "-v", "error", "-ss", f"{s0:.2f}", "-to", f"{e0:.2f}", "-i", c["source"],
          "-filter_complex", v, "-map", "[vo]", "-map", "0:a?", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
          "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-         "-ar", "48000", "-movflags", "+faststart", str(mp4)])
+         "-ar", "48000", "-movflags", "+faststart", str(mp4)], e0 - s0)
     info = c.get("info", {})
     save_json(out / f"clip_{a.pick}.json", {"file": str(mp4), "start": s0, "end": e0, "layout": layout, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_url": info.get("webpage_url"), "source_title": info.get("title"),

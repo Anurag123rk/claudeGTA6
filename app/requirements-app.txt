@@ -1,0 +1,5 @@
+# Vice Desk desktop app: pipeline requirements + GUI + packaging
+-r ../requirements.txt
+truststore>=0.9
+pywebview>=5.3; sys_platform == "win32"
+pyinstaller>=6.11

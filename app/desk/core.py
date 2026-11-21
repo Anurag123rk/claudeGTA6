@@ -1,0 +1,696 @@
+"""Vice Desk core: settings, tool detection, ffmpeg installer and the pipeline task runner.
+
+Every pipeline step runs as a child process (the scripts in ../scripts). Their output is parsed for
+the machine-readable lines the scripts print:
+
+  [STAGE] 2/5 Downloading video         -> current stage
+  [PROG] 12.00|60.00|transcribed        -> progress inside the stage
+  [VPROG] bytes|total|estimate|speed|eta|status   -> yt-dlp download progress (speed in bytes/s)
+
+plus tqdm bars (Whisper model download) and, as a last resort, the growth of files being downloaded.
+"""
+import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid, zipfile
+from pathlib import Path
+
+APP_NAME = "Vice Desk"
+VERSION = "1.0.0"
+IS_WIN = sys.platform == "win32"
+FROZEN = getattr(sys, "frozen", False)
+
+
+# ---------------------------------------------------------------- paths & settings
+
+def bundle_dir():
+    """Folder that holds scripts/ and ui/ (PyInstaller unpack dir when frozen)."""
+    if FROZEN:
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parents[2]  # repo root
+
+
+def scripts_dir():
+    return bundle_dir() / "scripts"
+
+
+def ui_dir():
+    return bundle_dir() / "ui" if FROZEN else Path(__file__).resolve().parent / "ui"
+
+
+def config_dir():
+    if IS_WIN:
+        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+    else:
+        base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    d = base / "ViceDesk"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def bin_dir():
+    if IS_WIN:
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+    d = base / "ViceDesk" / "bin"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def default_workspace():
+    docs = Path.home() / "Documents"
+    return (docs if docs.exists() else Path.home()) / "ViceDesk"
+
+
+class Settings:
+    DEFAULTS = {"workspace": "", "whisper_model": "small", "twitch_client_id": "", "twitch_token": ""}
+
+    def __init__(self):
+        self.path = config_dir() / "settings.json"
+        self.data = dict(self.DEFAULTS)
+        try:
+            self.data.update(json.loads(self.path.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+        if not self.data["workspace"]:
+            self.data["workspace"] = str(default_workspace())
+        self.lock = threading.Lock()
+
+    @property
+    def workspace(self):
+        p = Path(self.data["workspace"]).expanduser()
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def update(self, **kw):
+        with self.lock:
+            for k, v in kw.items():
+                if k in self.DEFAULTS and isinstance(v, str):
+                    self.data[k] = v.strip()
+            self.path.write_text(json.dumps(self.data, indent=1), encoding="utf-8")
+
+    def public(self):
+        d = dict(self.data)
+        d["twitch_token"] = "set" if d.get("twitch_token") else ""
+        return d
+
+
+SETTINGS = Settings()
+
+
+def child_env(extra=None):
+    env = dict(os.environ)
+    env["PATH"] = str(bin_dir()) + os.pathsep + env.get("PATH", "")
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["CLIP_DESK_HOME"] = str(SETTINGS.workspace)
+    env["WHISPER_MODEL"] = SETTINGS.data.get("whisper_model") or "small"
+    if SETTINGS.data.get("twitch_client_id") and SETTINGS.data.get("twitch_token"):
+        env["TWITCH_CLIENT_ID"] = SETTINGS.data["twitch_client_id"]
+        env["TWITCH_TOKEN"] = SETTINGS.data["twitch_token"]
+    env.update(extra or {})
+    return env
+
+
+def self_cmd():
+    """Command that starts this app in child mode (the .exe itself when frozen)."""
+    if FROZEN:
+        return [sys.executable]
+    return [sys.executable, str(Path(__file__).resolve().parents[1] / "vicedesk.py")]
+
+
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+# ---------------------------------------------------------------- tools
+
+def find_tool(name):
+    exe = name + (".exe" if IS_WIN else "")
+    local = bin_dir() / exe
+    if local.exists():
+        return str(local)
+    return shutil.which(name)
+
+
+def tool_status():
+    out = {}
+    for t in ("ffmpeg", "ffprobe"):
+        p = find_tool(t)
+        out[t] = {"ok": bool(p), "path": p or ""}
+    try:
+        import yt_dlp.version
+        out["yt-dlp"] = {"ok": True, "path": "bundled " + yt_dlp.version.__version__}
+    except Exception:
+        p = shutil.which("yt-dlp")
+        out["yt-dlp"] = {"ok": bool(p), "path": p or ""}
+    try:
+        import importlib.util
+        ok = importlib.util.find_spec("faster_whisper") is not None
+    except Exception:
+        ok = False
+    out["faster-whisper"] = {"ok": ok, "path": "bundled" if ok else ""}
+    return out
+
+
+FFMPEG_URLS = [
+    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+]
+
+
+# ---------------------------------------------------------------- tasks
+
+def fmt_bytes(n):
+    if n is None:
+        return ""
+    n = float(n)
+    for u in ("B", "KB", "MB", "GB"):
+        if n < 1024 or u == "GB":
+            return f"{n:.0f} {u}" if u == "B" else f"{n:.1f} {u}"
+        n /= 1024
+
+
+_UNITS = {"": 1, "k": 1e3, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
+TQDM = re.compile(r"(\d{1,3})%\|.*?\|\s*([\d.]+)([kKMG]?)B?/([\d.]+)([kKMG]?)B?\s*\[[^,\]]*(?:<([^,\]]*))?,\s*([\d.]+)([kKMG]?)B/s")
+STAGE = re.compile(r"^\[STAGE\]\s+(\d+)/(\d+)\s+(.*)$")
+PROG = re.compile(r"^\[PROG\]\s+([\d.]+)\|([\d.]+)\|(.*)$")
+VPROG = re.compile(r"\[VPROG\]\s+(\S+)\|(\S+)\|(\S+)\|(\S+)\|(\S+)\|(\S*)")
+# weights of the [STAGE] numbers inside a script, for the overall bar
+STAGE_WEIGHTS = {"moments.py": [0.03, 0.45, 0.04, 0.43, 0.05], "cut.py": [0.12, 0.88]}
+
+
+def _num(s):
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+class Cancelled(Exception):
+    pass
+
+
+class Task:
+    def __init__(self, kind, title, params):
+        self.id = uuid.uuid4().hex[:10]
+        self.kind, self.title, self.params = kind, title, params
+        self.state = "queued"  # queued running done failed cancelled
+        self.created = time.time(); self.started = None; self.ended = None
+        self.log = collections.deque(maxlen=800)
+        self.step = ""            # e.g. "Analyze video" / "Cut clip 2 of 3"
+        self.step_i, self.step_n = 0, 1
+        self.stage, self.stage_i, self.stage_n = "", 0, 0
+        self.stage_frac = None    # 0..1 or None (indeterminate)
+        self.detail = ""
+        self.download = None      # {bytes,total,speed,eta,source}
+        self.speed_hist = collections.deque(maxlen=90)
+        self.result = {}
+        self.error = ""
+        self.proc = None
+        self.cancel_flag = threading.Event()
+        self.stop_file = None
+        self.rev = 0
+        self._step_weights = [1.0]
+        self._last_vprog = 0
+        self._watch = None        # (glob root, patterns) for the file-growth speed fallback
+        self._watch_prev = None
+
+    # overall progress 0..1, or None when unknown
+    def progress(self):
+        if self.state == "done":
+            return 1.0
+        w = self._step_weights
+        done = sum(w[: self.step_i])
+        cur = w[self.step_i] if self.step_i < len(w) else 0
+        sf = self._script_frac()
+        if sf is None:
+            return None if self.step_n <= 1 else min(1.0, done / sum(w))
+        return min(1.0, (done + cur * sf) / sum(w))
+
+    def _script_frac(self):
+        """Progress of the running script, 0..1, from its [STAGE]/[PROG] lines (None if unknown)."""
+        if self.stage_n == 0:
+            return self.stage_frac
+        sw = STAGE_WEIGHTS.get(self.params.get("_script", ""))
+        i = max(0, min(self.stage_i - 1, self.stage_n - 1))
+        f = self.stage_frac or 0
+        if not sw or len(sw) != self.stage_n:
+            return min(1.0, (i + f) / self.stage_n)
+        return min(1.0, sum(sw[:i]) + sw[i] * f)
+
+    def summary(self, full=False):
+        d = {"id": self.id, "kind": self.kind, "title": self.title, "state": self.state,
+             "created": self.created, "started": self.started, "ended": self.ended,
+             "elapsed": ((self.ended or time.time()) - self.started) if self.started else 0,
+             "step": self.step, "step_i": self.step_i, "step_n": self.step_n,
+             "stage": self.stage, "stage_i": self.stage_i, "stage_n": self.stage_n,
+             "stage_frac": self.stage_frac, "progress": self.progress(), "detail": self.detail,
+             "download": self.download, "speed_hist": list(self.speed_hist), "result": self.result,
+             "error": self.error, "last": self.log[-1] if self.log else "", "params": {k: v for k, v in self.params.items() if not k.startswith("_")}}
+        if full:
+            d["log"] = list(self.log)
+        return d
+
+    def touch(self):
+        self.rev += 1
+
+    def add_log(self, line):
+        self.log.append(line)
+        self.touch()
+
+
+class TaskManager:
+    def __init__(self):
+        self.tasks = collections.OrderedDict()
+        self.lock = threading.Lock()
+        self.rev = 0
+        threading.Thread(target=self._monitor, daemon=True).start()
+
+    def list(self):
+        with self.lock:
+            return list(self.tasks.values())
+
+    def get(self, tid):
+        return self.tasks.get(tid)
+
+    def changed(self):
+        return sum(t.rev for t in self.list()) + len(self.tasks)
+
+    def start(self, kind, title, params, runner):
+        t = Task(kind, title, params)
+        with self.lock:
+            self.tasks[t.id] = t
+            while len(self.tasks) > 60:  # forget the oldest finished tasks
+                old = next((k for k, v in self.tasks.items() if v.state not in ("queued", "running")), None)
+                if not old:
+                    break
+                self.tasks.pop(old)
+
+        def go():
+            t.state = "running"; t.started = time.time(); t.touch()
+            try:
+                runner(t)
+                t.state = "cancelled" if t.cancel_flag.is_set() else "done"
+            except Cancelled:
+                t.state = "cancelled"
+            except Exception as e:  # noqa: BLE001 - surface every failure in the UI
+                t.state = "cancelled" if t.cancel_flag.is_set() else "failed"
+                if t.state == "failed":
+                    t.error = str(e) or e.__class__.__name__
+                    t.add_log("ERROR: " + t.error)
+            finally:
+                t.ended = time.time(); t.proc = None
+                if t.download:
+                    t.download["speed"] = 0
+                t.touch()
+        threading.Thread(target=go, daemon=True).start()
+        return t
+
+    def cancel(self, tid):
+        t = self.get(tid)
+        if not t or t.state not in ("queued", "running"):
+            return False
+        t.cancel_flag.set()
+        t.add_log("cancel requested")
+        if t.stop_file:  # live recording: ask it to stop and cut what is pending
+            Path(t.stop_file).write_text("stop", encoding="utf-8")
+            threading.Timer(90, lambda: kill_tree(t.proc)).start()
+        else:
+            kill_tree(t.proc)
+        return True
+
+    def cancel_all(self):
+        for t in self.list():
+            if t.state == "running":
+                self.cancel(t.id)
+
+    # speed fallback: when yt-dlp reports nothing (e.g. ffmpeg section downloads), measure file growth
+    def _monitor(self):
+        while True:
+            time.sleep(1)
+            for t in self.list():
+                if t.state != "running":
+                    continue
+                if t.download and time.time() - t._last_vprog < 2.5:
+                    t.speed_hist.append(t.download.get("speed") or 0)
+                    continue
+                if t._watch and "ownload" in (t.stage or ""):
+                    size = 0
+                    root, pats = t._watch
+                    for pat in pats:
+                        for f in root.glob(pat):
+                            try:
+                                size += f.stat().st_size
+                            except OSError:
+                                pass
+                    now = time.time()
+                    if t._watch_prev and size >= t._watch_prev[1]:
+                        sp = (size - t._watch_prev[1]) / max(0.2, now - t._watch_prev[0])
+                        t.download = dict(t.download or {}, bytes=size, speed=sp, source="file growth")
+                        t.speed_hist.append(sp); t.touch()
+                    t._watch_prev = (now, size)
+                elif t.download:
+                    t.speed_hist.append(0)
+
+
+def kill_tree(proc):
+    if not proc or proc.poll() is not None:
+        return
+    try:
+        if IS_WIN:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, creationflags=NO_WINDOW)
+        else:
+            import signal
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def handle_line(t, line):
+    line = line.rstrip()
+    if not line:
+        return
+    m = VPROG.search(line)
+    if m:
+        dl, tot, est, sp, eta = (_num(x) for x in m.groups()[:5])
+        status = m.group(6)
+        total = tot or est
+        prev = t.download or {}
+        part = prev.get("part", 1)
+        if prev.get("bytes") and dl is not None and dl + 1e6 < prev["bytes"] * 0.5:
+            part += 1  # yt-dlp moved on to the next file (video, then audio)
+        t.download = {"bytes": dl, "total": total, "speed": sp or 0, "eta": eta, "part": part, "source": "yt-dlp",
+                      "status": status}
+        t.stage_frac = (dl / total) if (dl is not None and total) else t.stage_frac
+        t.detail = f"{fmt_bytes(dl)} of {fmt_bytes(total)}" + (f" (file {part})" if part > 1 else "") if total else fmt_bytes(dl)
+        t._last_vprog = time.time()
+        t.touch()
+        return
+    m = STAGE.match(line)
+    if m:
+        t.stage_i, t.stage_n, t.stage = int(m.group(1)), int(m.group(2)), m.group(3)
+        t.stage_frac = 0.0; t.detail = ""
+        if "ownload" not in t.stage and t.download:
+            t.download = dict(t.download, speed=0)
+        t.add_log(f"» {t.stage}")
+        return
+    m = PROG.match(line)
+    if m:
+        d, tot, label = float(m.group(1)), float(m.group(2)), m.group(3)
+        t.stage_frac = d / tot if tot else None
+        mm = lambda s: f"{int(s // 60)}:{int(s % 60):02d}"
+        t.detail = f"{mm(d)} / {mm(tot)} {label}".strip()
+        t.touch()
+        return
+    m = TQDM.search(line)
+    if m:  # e.g. Whisper model download from Hugging Face
+        pct = int(m.group(1))
+        done = float(m.group(2)) * _UNITS.get(m.group(3), 1)
+        tot = float(m.group(4)) * _UNITS.get(m.group(5), 1)
+        sp = float(m.group(7)) * _UNITS.get(m.group(8), 1)
+        t.download = {"bytes": done, "total": tot, "speed": sp, "eta": None, "part": 1, "source": "model download"}
+        t.detail = f"speech model {pct}% ({fmt_bytes(done)} of {fmt_bytes(tot)})"
+        t._last_vprog = time.time()
+        t.touch()
+        return
+    t.add_log(line)
+
+
+def run_script(t, script, args, weight_i=0, ok_codes=(0,), extra_env=None, watch=None):
+    """Run scripts/<script> in a child process and stream its output into the task."""
+    if t.cancel_flag.is_set():
+        raise Cancelled()
+    t.params["_script"] = script
+    t.stage, t.stage_i, t.stage_n, t.stage_frac, t.detail = "", 0, 0, None, ""
+    t.step_i = weight_i
+    t._watch, t._watch_prev = watch, None
+    cmd = self_cmd() + ["--script", script] + [str(a) for a in args]
+    t.add_log("$ " + script + " " + " ".join(_q(a) for a in args))
+    kw = {}
+    if IS_WIN:
+        kw["creationflags"] = NO_WINDOW
+    else:
+        kw["start_new_session"] = True
+    t.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                              cwd=str(SETTINGS.workspace), env=child_env(extra_env), **kw)
+    buf = b""
+    while True:
+        chunk = t.proc.stdout.read1(4096) if hasattr(t.proc.stdout, "read1") else t.proc.stdout.read(4096)
+        if not chunk:
+            break
+        buf += chunk
+        parts = re.split(rb"[\r\n]", buf)
+        buf = parts.pop()
+        for p in parts:
+            handle_line(t, p.decode("utf-8", "replace"))
+    if buf:
+        handle_line(t, buf.decode("utf-8", "replace"))
+    rc = t.proc.wait()
+    if t.cancel_flag.is_set() and not t.stop_file:
+        raise Cancelled()
+    if rc not in ok_codes:
+        tail = [x for x in list(t.log)[-6:] if not x.startswith("$ ")]
+        raise RuntimeError(f"{script} failed (exit {rc}): " + (tail[-1] if tail else "no output"))
+    return rc
+
+
+def _q(a):
+    a = str(a)
+    return f'"{a}"' if (" " in a or not a) else a
+
+
+# ---------------------------------------------------------------- pipeline runners
+
+def ws():
+    return SETTINGS.workspace
+
+
+def job_from_log(t):
+    for line in reversed(t.log):
+        if line.startswith("job: "):
+            return line[5:].strip()
+    return None
+
+
+def runner_trends(p):
+    def r(t):
+        t.step = "Trend radar"
+        out = ws() / "trends.md"
+        run_script(t, "trends.py", ["--query", p.get("query") or "gta 6", "--hours", p.get("hours") or 24,
+                                    "--limit", p.get("limit") or 30, "--out", out])
+        t.result = {"file": str(out)}
+    return r
+
+
+def runner_streams(p):
+    def r(t):
+        t.step = "Live stream finder"
+        out = ws() / "streams.md"
+        run_script(t, "streams.py", ["--query", p.get("query") or "gta 6", "--limit", p.get("limit") or 20, "--out", out])
+        t.result = {"file": str(out)}
+    return r
+
+
+def _moment_args(p):
+    return [p["src"], "--top", p.get("top") or 8, "--min", p.get("min") or 15, "--max", p.get("max") or 40,
+            "--max-minutes", p.get("max_minutes") or 90]
+
+
+def _cut_args(job, n, p):
+    a = [job, "--pick", n, "--layout", p.get("layout") or "blur", "--captions", p.get("captions") or "word"]
+    if p.get("hook"):
+        a += ["--hook", p["hook"]]
+    if p.get("title"):
+        a += ["--title", p["title"]]
+    if p.get("start") not in (None, ""):
+        a += ["--start", p["start"]]
+    if p.get("end") not in (None, ""):
+        a += ["--end", p["end"]]
+    return a
+
+
+def _check(t, clip, p, i):
+    a = [clip]
+    camp = ws() / "campaigns.md"
+    if camp.exists():
+        a += ["--campaign", camp]
+    if p.get("caption"):
+        a += ["--caption", p["caption"]]
+    start = len(t.log)
+    rc = run_script(t, "check.py", a, weight_i=i, ok_codes=(0, 1))
+    lines = [x for x in list(t.log)[start:] if x.startswith(("PASS", "FAIL", "RESULT"))]
+    return {"clip": clip, "pass": rc == 0, "lines": lines}
+
+
+def runner_moments(p):
+    def r(t):
+        t.step = "Find best moments"
+        run_script(t, "moments.py", _moment_args(p), watch=(ws() / "jobs", ["*/source.mp4*", "*/source.*.part", "*/source.f*"]))
+        t.result = {"job": job_from_log(t)}
+    return r
+
+
+def runner_cut(p):
+    def r(t):
+        t._step_weights = [0.8, 0.2]; t.step_n = 2
+        t.step = f"Cut clip {p['pick']}"
+        run_script(t, "cut.py", _cut_args(p["job"], p["pick"], p), weight_i=0)
+        clip = str(Path(p["job"]) / "edits" / f"clip_{p['pick']}.mp4")
+        t.step = "Rule check"
+        chk = _check(t, clip, p, 1)
+        t.result = {"job": p["job"], "clips": [clip], "checks": [chk]}
+    return r
+
+
+def runner_check(p):
+    def r(t):
+        t.step = "Rule check"
+        t.result = {"checks": [_check(t, p["clip"], p, 0)]}
+    return r
+
+
+def runner_pipeline(p):
+    """Full pipeline: find moments -> cut the N best -> rule-check each."""
+    def r(t):
+        n = max(1, min(int(p.get("clips") or 3), 10))
+        t.step_n = 1 + 2 * n
+        t._step_weights = [6.0] + [1.2, 0.1] * n
+        t.step = "Find best moments"
+        run_script(t, "moments.py", _moment_args(p), weight_i=0,
+                   watch=(ws() / "jobs", ["*/source.mp4*", "*/source.*.part", "*/source.f*"]))
+        job = job_from_log(t)
+        if not job:
+            raise RuntimeError("moments.py did not report a job folder")
+        cands = json.loads((Path(job) / "candidates.json").read_text(encoding="utf-8"))["candidates"]
+        best = sorted(cands, key=lambda c: -c["score"])[:n]
+        if not best:
+            raise RuntimeError("no clip-worthy moments found in this video")
+        clips, checks = [], []
+        t.result = {"job": job, "clips": clips, "checks": checks}
+        for k, c in enumerate(best):
+            t.step = f"Cut clip {k + 1} of {len(best)} (moment #{c['n']})"
+            try:
+                run_script(t, "cut.py", _cut_args(job, c["n"], p), weight_i=1 + 2 * k)
+            except Cancelled:
+                raise
+            except RuntimeError as e:  # one bad moment (e.g. no facecam) should not kill the batch
+                t.add_log(f"skipped moment #{c['n']}: {e}")
+                continue
+            clip = str(Path(job) / "edits" / f"clip_{c['n']}.mp4")
+            clips.append(clip)
+            t.step = f"Rule check {k + 1} of {len(best)}"
+            checks.append(_check(t, clip, p, 2 + 2 * k))
+            t.touch()
+        if not clips:
+            raise RuntimeError("no clip could be cut; try another layout (blur works everywhere)")
+    return r
+
+
+def runner_live(p):
+    def r(t):
+        t.step = "Live recording"
+        t.stop_file = str(config_dir() / f"stop-{t.id}")
+        Path(t.stop_file).unlink(missing_ok=True)
+        args = [p["url"], "--minutes", p.get("minutes") or 60, "--ratio", p.get("ratio") or 3,
+                "--before", p.get("before") or 15, "--after", p.get("after") or 20]
+        try:
+            run_script(t, "live.py", args, extra_env={"VICE_STOP_FILE": t.stop_file})
+        finally:
+            Path(t.stop_file).unlink(missing_ok=True)
+        t.result = {"job": next((x.split(" -> ")[-1].split("  ")[0] for x in t.log if x.startswith("recording ")), "")}
+    return r
+
+
+def runner_install_ffmpeg(p):
+    def r(t):
+        import io, requests
+        t.step = "Install ffmpeg"
+        if not IS_WIN:
+            raise RuntimeError("Automatic install is for Windows. Install ffmpeg with your package manager "
+                               "(apt install ffmpeg / brew install ffmpeg).")
+        last = None
+        for url in FFMPEG_URLS:
+            try:
+                t.stage, t.stage_frac = "Downloading ffmpeg", 0.0
+                t.add_log("downloading " + url)
+                data = io.BytesIO()
+                with requests.get(url, stream=True, timeout=30) as resp:
+                    resp.raise_for_status()
+                    total = int(resp.headers.get("content-length") or 0) or None
+                    got, win = 0, collections.deque()
+                    for chunk in resp.iter_content(256 * 1024):
+                        if t.cancel_flag.is_set():
+                            raise Cancelled()
+                        data.write(chunk); got += len(chunk)
+                        now = time.time(); win.append((now, got))
+                        while len(win) > 2 and now - win[0][0] > 3:
+                            win.popleft()
+                        sp = (got - win[0][1]) / max(0.05, now - win[0][0]) if len(win) > 1 else 0
+                        eta = (total - got) / sp if (total and sp) else None
+                        t.download = {"bytes": got, "total": total, "speed": sp, "eta": eta, "part": 1, "source": "ffmpeg"}
+                        t._last_vprog = now
+                        t.stage_frac = got / total if total else None
+                        t.detail = f"{fmt_bytes(got)} of {fmt_bytes(total)}" if total else fmt_bytes(got)
+                        t.touch()
+                t.stage, t.stage_frac, t.detail = "Unpacking", None, ""
+                t.add_log("unpacking")
+                with zipfile.ZipFile(data) as z:
+                    found = 0
+                    for name in z.namelist():
+                        base = name.rsplit("/", 1)[-1].lower()
+                        if base in ("ffmpeg.exe", "ffprobe.exe"):
+                            (bin_dir() / base).write_bytes(z.read(name)); found += 1
+                if found < 2:
+                    raise RuntimeError("archive did not contain ffmpeg.exe and ffprobe.exe")
+                t.add_log(f"installed to {bin_dir()}")
+                t.result = {"path": str(bin_dir())}
+                return
+            except Cancelled:
+                raise
+            except Exception as e:  # try the next mirror
+                last = e
+                t.add_log(f"failed: {e}")
+        raise RuntimeError(f"could not install ffmpeg: {last}")
+    return r
+
+
+RUNNERS = {"trends": runner_trends, "streams": runner_streams, "moments": runner_moments, "cut": runner_cut,
+           "check": runner_check, "pipeline": runner_pipeline, "live": runner_live, "install_ffmpeg": runner_install_ffmpeg}
+
+
+# ---------------------------------------------------------------- library
+
+def list_jobs():
+    root = ws() / "jobs"
+    out = []
+    if not root.exists():
+        return out
+    for d in sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not d.is_dir():
+            continue
+        j = {"dir": str(d), "name": d.name, "mtime": d.stat().st_mtime, "title": d.name, "url": "", "candidates": [],
+             "clips": [], "live": []}
+        try:
+            info = json.loads((d / "info.json").read_text(encoding="utf-8"))
+            j["title"] = info.get("title") or d.name; j["url"] = info.get("webpage_url") or ""
+            j["channel"] = info.get("channel") or info.get("uploader") or ""
+        except Exception:
+            pass
+        try:
+            c = json.loads((d / "candidates.json").read_text(encoding="utf-8"))
+            j["candidates"] = c.get("candidates", []); j["duration"] = c.get("duration")
+        except Exception:
+            pass
+        for f in sorted((d / "edits").glob("clip_*.mp4")) if (d / "edits").exists() else []:
+            meta = {}
+            try:
+                meta = json.loads(f.with_suffix(".json").read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            j["clips"].append({"file": str(f), "name": f.name, "size": f.stat().st_size, "hook": meta.get("hook", ""),
+                               "layout": meta.get("layout", ""), "start": meta.get("start"), "end": meta.get("end")})
+        if (d / "live").exists():
+            j["live"] = [{"file": str(f), "name": f.name, "size": f.stat().st_size} for f in sorted((d / "live").glob("spike_*.mp4"))]
+        out.append(j)
+    return out

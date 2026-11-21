@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Vice Desk</title>
+<link rel="stylesheet" href="app.css">
+<script>window.DESK_TOKEN = "__DESK_TOKEN__";</script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="logo">V</span><div><b>Vice Desk</b><small id="ver">GTA 6 clip pipeline</small></div></div>
+    <nav id="nav">
+      <a data-page="dashboard" class="on"><i>◉</i>Dashboard</a>
+      <a data-page="find"><i>⌕</i>Find videos</a>
+      <a data-page="pipeline"><i>▶</i>Pipeline</a>
+      <a data-page="live"><i>●</i>Live mode</a>
+      <a data-page="library"><i>▤</i>Clips &amp; jobs</a>
+      <a data-page="monitor"><i>≋</i>Monitor <span class="pill" id="runCount" hidden>0</span></a>
+      <a data-page="settings"><i>⚙</i>Settings</a>
+    </nav>
+    <div class="side-foot">
+      <div class="net"><span>Network</span><b id="netSpeed">idle</b></div>
+      <svg id="netSpark" class="spark" viewBox="0 0 160 30" preserveAspectRatio="none"></svg>
+      <div class="conn" id="conn"><span class="dot"></span> <span>connecting…</span></div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <!-- DASHBOARD -->
+    <section class="page on" id="page-dashboard">
+      <header class="hero">
+        <div>
+          <h1>Clip control room</h1>
+          <p>Paste a GTA 6 video or VOD. Vice Desk downloads it, finds the best moments, cuts vertical clips with captions and checks them. Everything runs on this PC, with no account needed.</p>
+        </div>
+      </header>
+      <div id="setupBanner" class="banner" hidden></div>
+      <div class="grid2">
+        <div class="card">
+          <h2>Quick start</h2>
+          <form id="quickForm" class="stack">
+            <label>Video URL or file path<input name="src" placeholder="https://www.youtube.com/watch?v=…  or  C:\Videos\stream.mp4" required></label>
+            <div class="row">
+              <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
+              <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+              <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
+            </div>
+            <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
+            <div class="row end"><button class="primary" type="submit">Run full pipeline</button></div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Setup</h2>
+          <ul class="checks" id="toolList"><li class="muted">Checking tools…</li></ul>
+          <p class="muted small">Workspace: <a href="#" id="wsLink" class="mono">…</a></p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Live monitor</h2><a href="#" data-goto="monitor" class="small">All tasks →</a></div>
+        <div id="dashTasks" class="tasks"><p class="muted">Nothing running. Start a pipeline above or find a video first.</p></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Latest clips</h2><a href="#" data-goto="library" class="small">Library →</a></div>
+        <div id="dashClips" class="clipgrid"><p class="muted">No clips yet.</p></div>
+      </div>
+    </section>
+
+    <!-- FIND -->
+    <section class="page" id="page-find">
+      <h1>Find videos</h1>
+      <div class="tabs" id="findTabs"><button data-tab="trends" class="on">Trending videos</button><button data-tab="streams">Live streams</button></div>
+      <div class="card">
+        <form id="findForm" class="row">
+          <label class="grow">Search<input name="query" value="gta 6"></label>
+          <label data-only="trends">Last hours<input name="hours" type="number" min="1" max="168" value="24"></label>
+          <label>Max results<input name="limit" type="number" min="5" max="60" value="30"></label>
+          <button class="primary" type="submit">Search</button>
+        </form>
+        <div id="findTask" class="tasks"></div>
+      </div>
+      <div class="card"><div id="findResults"><p class="muted">Run a search to see results.</p></div></div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section class="page" id="page-pipeline">
+      <h1>Pipeline</h1>
+      <div class="stages">
+        <span>1 Download</span><span>2 Audio</span><span>3 Transcribe</span><span>4 Score moments</span><span>5 Cut clips</span><span>6 Rule check</span>
+      </div>
+      <div class="card">
+        <form id="pipeForm" class="stack">
+          <label>Video URL or file path<input name="src" placeholder="https://www.youtube.com/watch?v=…" required></label>
+          <div class="row">
+            <label>Moments<input name="top" type="number" min="1" max="20" value="8"></label>
+            <label>Min sec<input name="min" type="number" min="5" max="120" value="15"></label>
+            <label>Max sec<input name="max" type="number" min="7" max="180" value="40"></label>
+            <label>Max minutes downloaded<input name="max_minutes" type="number" min="1" max="600" value="90"></label>
+            <label>Clips to cut<input name="clips" type="number" min="1" max="10" value="3"></label>
+          </div>
+          <div class="row">
+            <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+            <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
+            <label class="grow">Hook<input name="hook" maxlength="80" placeholder="optional on-screen opener"></label>
+          </div>
+          <label>Post caption (checked for banned words and campaign hashtags)<input name="caption" placeholder="#GTA6 credit @creator"></label>
+          <div class="row end">
+            <button type="button" id="momentsOnly">Find moments only</button>
+            <button class="primary" type="submit">Run full pipeline</button>
+          </div>
+        </form>
+        <div id="pipeTask" class="tasks"></div>
+      </div>
+      <div class="card" id="pipeJob"><p class="muted">Candidates of the last analyzed video show up here.</p></div>
+    </section>
+
+    <!-- LIVE -->
+    <section class="page" id="page-live">
+      <h1>Live mode</h1>
+      <p class="muted">Records a YouTube or Twitch live stream and cuts a clip each time chat explodes.</p>
+      <div class="card">
+        <form id="liveForm" class="stack">
+          <label>Live stream URL<input name="url" placeholder="https://twitch.tv/<channel> or a YouTube live URL" required></label>
+          <div class="row">
+            <label>Minutes<input name="minutes" type="number" min="1" max="600" value="60"></label>
+            <label>Spike ratio<input name="ratio" type="number" step="0.5" min="1.5" max="10" value="3"></label>
+            <label>Seconds before<input name="before" type="number" min="3" max="60" value="15"></label>
+            <label>Seconds after<input name="after" type="number" min="3" max="60" value="20"></label>
+          </div>
+          <div class="row end"><button class="primary" type="submit">Start recording</button></div>
+        </form>
+        <div id="liveTask" class="tasks"></div>
+      </div>
+    </section>
+
+    <!-- LIBRARY -->
+    <section class="page" id="page-library">
+      <div class="card-h"><h1>Clips &amp; jobs</h1><div><button id="openWs">Open folder</button> <button id="refreshJobs">Refresh</button></div></div>
+      <div id="jobs"><p class="muted">Loading…</p></div>
+    </section>
+
+    <!-- MONITOR -->
+    <section class="page" id="page-monitor">
+      <div class="card-h"><h1>Monitor</h1><button id="clearTasks">Clear finished</button></div>
+      <div class="monitor">
+        <div id="allTasks" class="tasks"><p class="muted">No tasks yet.</p></div>
+        <div class="card logcard"><div class="card-h"><h2 id="logTitle">Log</h2><label class="small"><input type="checkbox" id="follow" checked> follow</label></div><pre id="log" class="log">Select a task to see its live log.</pre></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <h1>Settings</h1>
+      <div class="card">
+        <form id="setForm" class="stack">
+          <label>Workspace folder (jobs, clips and reports go here)<input name="workspace" class="mono"></label>
+          <label>Speech model<select name="whisper_model">
+            <option value="tiny">tiny (fastest, ~75 MB)</option><option value="base">base (~145 MB)</option>
+            <option value="small">small (recommended, ~460 MB)</option><option value="medium">medium (best, ~1.5 GB, slow on CPU)</option></select></label>
+          <div class="row">
+            <label class="grow">Twitch Client-ID (optional)<input name="twitch_client_id" autocomplete="off"></label>
+            <label class="grow">Twitch token (optional)<input name="twitch_token" type="password" autocomplete="off" placeholder="leave empty to keep"></label>
+          </div>
+          <div class="row end"><button class="primary" type="submit">Save</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Campaign rules <span class="muted small">(campaigns.md, used by the rule check)</span></h2>
+        <p class="muted small">Lines understood: <code>min_seconds: 15</code> · <code>max_seconds: 60</code> · <code>required_hashtags: #a #b</code> · <code>required_mention: @x</code></p>
+        <textarea id="campaigns" rows="8" class="mono"></textarea>
+        <div class="row end"><button id="saveCamp" class="primary">Save rules</button></div>
+      </div>
+      <div class="card">
+        <h2>About</h2>
+        <p class="muted small" id="about"></p>
+        <div class="row"><button id="quitBtn" class="danger">Quit Vice Desk</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast" hidden></div>
+<dialog id="player"><div class="card-h"><b id="playerTitle"></b><button id="closePlayer">Close</button></div><video id="video" controls playsinline></video></dialog>
+<script src="app.js"></script>
+</body>
+</html>

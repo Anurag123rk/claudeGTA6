@@ -1,0 +1,89 @@
+name: Build Vice Desk (Windows .exe)
+
+on:
+  push:
+    branches: [main, master, "claude/**"]
+    tags: ["v*"]
+    paths: ["app/**", "scripts/**", "requirements.txt", ".github/workflows/release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vice-desk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            app/requirements-app.txt
+
+      - name: Install dependencies
+        working-directory: app
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-app.txt
+
+      - name: Read version
+        id: ver
+        shell: bash
+        run: echo "version=$(python -c "import re;print(re.search(r'VERSION = \"([^\"]+)\"', open('app/desk/core.py').read()).group(1))")" >> "$GITHUB_OUTPUT"
+
+      - name: Build ViceDesk.exe
+        working-directory: app
+        run: pyinstaller --noconfirm --clean vicedesk.spec
+
+      - name: Smoke test the .exe
+        working-directory: app
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path ".\dist\ViceDesk.exe").Path
+          function Invoke-Desk([string[]]$a) {
+            $out = Join-Path $env:RUNNER_TEMP ("o" + [guid]::NewGuid() + ".txt")
+            $p = Start-Process -FilePath $exe -ArgumentList $a -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError "$out.err"
+            $txt = (Get-Content $out -Raw) + (Get-Content "$out.err" -Raw)
+            Write-Host "> $a (exit $($p.ExitCode))"; Write-Host $txt
+            return $txt
+          }
+          if (-not (Invoke-Desk @("-m", "yt_dlp", "--version")).Trim()) { throw "bundled yt-dlp did not run" }
+          foreach ($s in "check.py", "moments.py", "cut.py", "trends.py", "streams.py", "live.py") {
+            if ((Invoke-Desk @("--script", $s, "--help")) -notmatch "usage: $s") { throw "$s failed to start" }
+          }
+          # GUI engine: start in browser mode on a fixed port and query the API
+          $env:BROWSER = "none"
+          $p = Start-Process -FilePath $exe -ArgumentList "--browser","--port","8765" -PassThru
+          Start-Sleep -Seconds 20
+          $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8765/
+          if ($r.Content -notmatch "Vice Desk") { throw "UI not served" }
+          $tok = [regex]::Match($r.Content, 'DESK_TOKEN = "([^"]+)"').Groups[1].Value
+          $s = Invoke-RestMethod -Headers @{ "X-Desk-Token" = $tok } http://127.0.0.1:8765/api/status
+          Write-Host ($s | ConvertTo-Json -Depth 4)
+          if (-not $s.tools.'faster-whisper'.ok) { throw "faster-whisper not bundled" }
+          Stop-Process -Id $p.Id -Force
+          Get-Item $exe | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ViceDesk-${{ steps.ver.outputs.version }}-windows
+          path: app/dist/ViceDesk.exe
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Vice Desk ${{ steps.ver.outputs.version }} (Windows)
+          body_path: app/RELEASE_NOTES.md
+          files: app/dist/ViceDesk.exe
+          make_latest: true
+          overwrite_files: true

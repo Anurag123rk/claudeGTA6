@@ -19,6 +19,22 @@
 
 ---
 
+## Vice Desk: the Windows app (no Claude Code needed)
+
+**[Download ViceDesk.exe from Releases](https://github.com/Anurag123rk/claudeGTA6/releases/latest)**, double-click it, done. No Python, no login, no cloud backend.
+
+- **Paste a video, get clips.** The full pipeline runs in one click: download → transcribe → score moments → cut 1080x1920 clips → rule check.
+- **Live monitor.** Step, stage and overall progress for every task, with **live download speed**, ETA, a speed graph and the full log.
+- **Find videos.** Trending GTA 6 videos and live streams, with "Clip it" and "Record live" buttons on each row.
+- **Live mode.** Records a Twitch/YouTube stream and cuts a clip every time chat explodes. Stop it any time from the GUI.
+- **Library.** Every job, its candidate moments (cut any of them with a chosen layout) and in-app clip previews.
+
+First run: if SmartScreen warns, click *More info → Run anyway* (the app is unsigned). Then click **Install ffmpeg** on the dashboard. Output goes to `Documents\ViceDesk`.
+
+Run from source on any OS: `pip install -r app/requirements-app.txt && python app/vicedesk.py` (add `--browser` to use your browser instead of a window). The `.exe` is built by [`.github/workflows/release.yml`](.github/workflows/release.yml) with PyInstaller (`app/vicedesk.spec`).
+
+---
+
 ## Install in Claude Code, from zero
 
 This section assumes you've never used Claude Code before.
