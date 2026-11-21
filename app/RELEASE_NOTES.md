@@ -1,24 +1,25 @@
-## Vice Desk 1.1.0: GTA 6 clip pipeline for Windows
+## Vice Desk 2.0.0: Windows app + Android app
 
-**Download `ViceDesk.exe` below and double-click it.** No Python, no ffmpeg install, no login.
+| Platform | Download | Install |
+|---|---|---|
+| **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.0.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
 
-### What's new in 1.1.0
-- **ffmpeg is built in.** Nothing extra to install.
-- **First-launch model picker.** Choose your speech model (tiny / base / small / medium). It downloads once with live speed, progress and ETA, then the app carries on to the dashboard and works offline. Change or add models any time in Settings.
-- **Fixed: Trend radar crash on Windows** (`UnicodeEncodeError: 'charmap' codec can't encode character`) when video titles contain emoji. Progress lines also arrive in real time now instead of in bursts.
-- **Fixed: garbage in the URL box.** Pasted text that isn't a URL or an existing file is rejected with a clear message instead of failing mid-pipeline.
+### New in 2.0.0
+- **Android app.** The same clip pipeline runs on your phone: find trending videos, paste or share a link (Share → Vice Desk from the YouTube or Twitch app), download with live speed, find the best moments, cut 1080x1920 clips and rule-check them. Then **Share** a clip straight to TikTok, Instagram or YouTube, or **Save** it to your gallery (Movies/ViceDesk). You can also pick a video already on your phone.
+- **Video search is much faster and works again.** Trend radar used to start a separate download process for every one of the 30 results. Now it reads the whole YouTube results page in **one request**, then checks "most replayed" for only the top 8, in parallel (untick the box to skip even that). The live-stream finder also uses one request.
+- **YouTube downloads are reliable again.** YouTube now requires a JavaScript runtime. The Windows app bundles Deno and the Android app bundles QuickJS, so you don't need to install anything.
+- Downloads run inside the app instead of as separate processes: faster start, same live speed/ETA readout.
 
-### Also in this app (since 1.0.0)
-- No login and no cloud backend; the front page loads instantly.
-- Live monitor for every task: step, stage, overall %, live log, download speed, ETA and a speed graph.
-- One-click full pipeline: download → transcribe → score moments → cut 1080x1920 clips → rule check.
-- Trend radar, live-stream finder, live recording with chat-spike clips, and a clip library with previews.
+### Android notes
+- Captions: the speech engine (faster-whisper) has no Android build, so phone clips are cut **without captions**. Moments are still scored on loudness, YouTube "most replayed" and chat activity. Use the Windows app for captioned clips.
+- Live recording is Windows-only for now.
+- Keep the app open while a long video downloads or encodes. The screen stays on, but Android may pause apps in the background.
+- Built for 64-bit ARM phones (almost every phone since 2019).
 
-### First run
-1. Windows SmartScreen may warn because the app is unsigned: click **More info → Run anyway**.
-2. Pick a speech model (**small** is recommended) and wait for the download.
-3. Paste a YouTube/Twitch VOD URL or a local video file and click **Run full pipeline**.
+### From 1.x
+- ffmpeg is built in. The first launch of the Windows app lets you pick a speech model (tiny/base/small/medium) and downloads it with a live speed readout.
+- No login and no cloud backend. The live monitor shows progress, a log and download speed for every task.
+- Emoji in video titles no longer crash the trend radar; invalid links and paths are rejected with a clear message.
 
-Clips, reports and jobs go to `Documents\ViceDesk`. Models are stored in `%LOCALAPPDATA%\ViceDesk\models`. You approve every post; nothing is uploaded.
-
-Needs Windows 10/11 (64-bit) with the Edge WebView2 runtime, which ships with Windows 11 and current Windows 10. Without it, the app opens in your default browser instead.
+You approve every post; nothing is uploaded automatically.

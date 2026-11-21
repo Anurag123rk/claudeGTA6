@@ -13,15 +13,18 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "1.1.0"
+VERSION = "2.0.0"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
+IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
 
 
 # ---------------------------------------------------------------- paths & settings
 
 def bundle_dir():
     """Folder that holds scripts/ and ui/ (PyInstaller unpack dir when frozen)."""
+    if IS_ANDROID:
+        return Path(os.environ["VICE_BUNDLE"])  # assets unpacked by the app
     if FROZEN:
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
     return Path(__file__).resolve().parents[2]  # repo root
@@ -32,10 +35,14 @@ def scripts_dir():
 
 
 def ui_dir():
-    return bundle_dir() / "ui" if FROZEN else Path(__file__).resolve().parent / "ui"
+    return bundle_dir() / "ui" if (FROZEN or IS_ANDROID) else Path(__file__).resolve().parent / "ui"
 
 
 def config_dir():
+    if IS_ANDROID:
+        d = Path(os.environ["VICE_HOME"]) / "config"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
     if IS_WIN:
         base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
     else:
@@ -46,6 +53,10 @@ def config_dir():
 
 
 def bin_dir():
+    if IS_ANDROID:
+        d = Path(os.environ["VICE_HOME"]) / "bin"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
     if IS_WIN:
         base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     else:
@@ -56,6 +67,8 @@ def bin_dir():
 
 
 def default_workspace():
+    if IS_ANDROID:
+        return Path(os.environ["VICE_WORKSPACE"])
     docs = Path.home() / "Documents"
     return (docs if docs.exists() else Path.home()) / "ViceDesk"
 
@@ -178,6 +191,9 @@ def tool_status():
         ok = importlib.util.find_spec("faster_whisper") is not None
     except Exception:
         ok = False
+    if IS_ANDROID:
+        out["faster-whisper"] = {"ok": False, "models": [], "path": "not on Android: clips are cut without captions"}
+        return out
     m = installed_models() + [x for x in bundled_models() if x not in installed_models()]
     out["faster-whisper"] = {"ok": ok and bool(m), "models": m, "path": ("models: " + ", ".join(m)) if (ok and m) else ("no speech model yet" if ok else "")}
     return out
@@ -450,14 +466,106 @@ def handle_line(t, line):
     t.add_log(line)
 
 
+class _Router:
+    """sys.stdout/sys.stderr stand-in for in-process scripts: text goes to the running task's log."""
+    encoding = "utf-8"
+    errors = "replace"
+
+    def __init__(self, base):
+        self.base = base
+
+    def write(self, s):
+        sink = _INPROC["sink"]
+        if sink:
+            sink(s)
+        elif self.base is not None:
+            self.base.write(s)
+        return len(s)
+
+    def flush(self):
+        if self.base is not None:
+            try:
+                self.base.flush()
+            except Exception:
+                pass
+
+    def isatty(self):
+        return False
+
+    def reconfigure(self, **kw):
+        pass
+
+
+_INPROC = {"sink": None, "lock": threading.Lock(), "installed": False}
+
+
+def run_script_inproc(t, script, args, ok_codes=(0,), extra_env=None):
+    """Android: run a script inside this process (one at a time), with its output routed to the task."""
+    import runpy, traceback
+    if not _INPROC["installed"]:
+        sys.stdout, sys.stderr = _Router(sys.stdout), _Router(sys.stderr)
+        _INPROC["installed"] = True
+    if not _INPROC["lock"].acquire(blocking=False):
+        t.stage, t.detail = "Waiting for the running task to finish", ""; t.touch()
+        while not _INPROC["lock"].acquire(timeout=0.5):
+            if t.cancel_flag.is_set():
+                raise Cancelled()
+    buf = [""]
+
+    def sink(text):
+        buf[0] += text
+        parts = re.split(r"[\r\n]", buf[0])
+        buf[0] = parts.pop()
+        for line in parts:
+            handle_line(t, line)
+    rc = 0
+    try:
+        os.environ.update(child_env(extra_env))
+        os.chdir(SETTINGS.workspace)
+        sd = str(scripts_dir())
+        if sd not in sys.path:
+            sys.path.insert(0, sd)
+        import common
+        common.CANCEL_CHECK = t.cancel_flag.is_set
+        _INPROC["sink"] = sink
+        sys.argv = [os.path.join(sd, script)] + [str(a) for a in args]
+        try:
+            runpy.run_path(sys.argv[0], run_name="__main__")
+        except SystemExit as e:
+            if e.code not in (None, 0):
+                rc = e.code if isinstance(e.code, int) else 1
+                if not isinstance(e.code, int):
+                    sink(str(e.code) + "\n")
+        except Exception:
+            sink(traceback.format_exc()); rc = 1
+    finally:
+        _INPROC["sink"] = None
+        if buf[0]:
+            handle_line(t, buf[0])
+        try:
+            common.CANCEL_CHECK = None
+        except NameError:
+            pass
+        _INPROC["lock"].release()
+    if t.cancel_flag.is_set() and not t.stop_file:
+        raise Cancelled()
+    if rc not in ok_codes:
+        tail = [x for x in list(t.log)[-6:] if not x.startswith("$ ")]
+        raise RuntimeError(f"{script} failed: " + (tail[-1] if tail else "no output"))
+    return rc
+
+
 def run_script(t, script, args, weight_i=0, ok_codes=(0,), extra_env=None, watch=None):
-    """Run scripts/<script> in a child process and stream its output into the task."""
+    """Run scripts/<script> in a child process (in-process on Android) and stream its output into the task."""
     if t.cancel_flag.is_set():
         raise Cancelled()
     t.params["_script"] = script
     t.stage, t.stage_i, t.stage_n, t.stage_frac, t.detail = "", 0, 0, None, ""
     t.step_i = weight_i
     t._watch, t._watch_prev = watch, None
+    if IS_ANDROID:
+        t.add_log("$ " + script + " " + " ".join(_q(a) for a in args))
+        return run_script_inproc(t, script, args, ok_codes=ok_codes, extra_env=extra_env)
     cmd = self_cmd() + ["--script", script] + [str(a) for a in args]
     t.add_log("$ " + script + " " + " ".join(_q(a) for a in args))
     kw = {}
@@ -511,7 +619,8 @@ def runner_trends(p):
         t.step = "Trend radar"
         out = ws() / "trends.md"
         run_script(t, "trends.py", ["--query", p.get("query") or "gta 6", "--hours", p.get("hours") or 24,
-                                    "--limit", p.get("limit") or 30, "--out", out])
+                                    "--limit", p.get("limit") or 30, "--deep", 8 if p.get("deep", "1") else 0,
+                                    "--out", out])
         t.result = {"file": str(out)}
     return r
 

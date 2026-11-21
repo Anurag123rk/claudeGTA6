@@ -50,14 +50,101 @@ def ytdlp_base(progress=False):
     return base
 
 
+CANCEL_CHECK = None  # set by an in-process host (Android app): returns True when the user pressed Stop
+
+
+def check_cancel():
+    if CANCEL_CHECK is not None and CANCEL_CHECK():
+        raise SystemExit("cancelled")
+
+
 def stage(n, total, name):
     """Announce a pipeline stage ([STAGE] 2/5 Transcribing)."""
+    check_cancel()
     print(f"[STAGE] {n}/{total} {name}", flush=True)
 
 
 def progress(done, total, label=""):
     """Announce progress inside the current stage ([PROG] done|total|label)."""
+    check_cancel()
     print(f"[PROG] {done:.2f}|{total:.2f}|{label}", flush=True)
+
+
+# ---------------------------------------------------------------- in-process yt-dlp
+# Running yt-dlp as a library is much faster than one process per video (each start of the packaged app
+# costs seconds) and it is the only way on Android, where there is no Python executable to spawn.
+
+def ytdl_opts(**extra):
+    opts = {"quiet": True, "no_warnings": True, "noprogress": True, "socket_timeout": 20, "retries": 3,
+            "extractor_retries": 2}
+    ff = shutil.which("ffmpeg")
+    if ff:
+        opts["ffmpeg_location"] = os.path.dirname(ff)
+    rt = os.environ.get("VICE_JS_RUNTIME")  # e.g. "quickjs:/data/.../bin/qjs" (Android); default: deno on PATH
+    if rt:
+        name, _, path = rt.partition(":")
+        opts["js_runtimes"] = {name: ({"path": path} if path else {})}
+    if sys.platform == "win32":
+        opts["compat_opts"] = {"no-certifi"}
+    opts.update(extra)
+    return opts
+
+
+def ytdl_search(url, limit):
+    """One request: a YouTube results page as flat entries (title, views or live viewers, approximate upload
+    time, duration, channel, live status). No per-video page loads."""
+    import yt_dlp
+    opts = ytdl_opts(extract_flat="in_playlist", playlistend=int(limit), skip_download=True,
+                     extractor_args={"youtubetab": {"approximate_date": [""]}})
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+    return [e for e in (info or {}).get("entries") or [] if e]
+
+
+def ytdl_info(url):
+    """Metadata of one video without format processing (fast, and never fails on 'format not available')."""
+    import yt_dlp
+    opts = ytdl_opts(skip_download=True, ignore_no_formats_error=True,
+                     extractor_args={"youtube": {"skip": ["dash", "hls", "translated_subs"]}})
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        return ydl.sanitize_info(ydl.extract_info(url, download=False, process=False))
+
+
+def ytdl_download(url, out, fmt, max_seconds=None):
+    """Download url to out (mp4), printing [VPROG] lines. Raises SystemExit with a readable message on failure."""
+    import yt_dlp
+
+    def hook(d):
+        check_cancel()
+        if d.get("status") in ("downloading", "finished"):
+            n = lambda k: "NA" if d.get(k) is None else d.get(k)
+            print(f"[VPROG] {n('downloaded_bytes')}|{n('total_bytes')}|{n('total_bytes_estimate')}|{n('speed')}|"
+                  f"{n('eta')}|{d.get('status')}", flush=True)
+
+    opts = ytdl_opts(format=fmt, outtmpl=str(out), merge_output_format="mp4", progress_hooks=[hook],
+                     concurrent_fragment_downloads=4, noprogress=True)
+    if max_seconds:
+        from yt_dlp.utils import download_range_func
+        opts["download_ranges"] = download_range_func([], [[0, max_seconds]])
+        opts["force_keyframes_at_cuts"] = False
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            rc = ydl.download([url])
+    except yt_dlp.utils.DownloadError as e:
+        sys.exit(f"download failed: {str(e).replace('ERROR: ', '')[:400]}")
+    if rc:
+        sys.exit("download failed (see log)")
+
+
+def ytdl_chat_replay(url, outtmpl):
+    """Save a finished stream's YouTube live-chat replay next to the job (best effort)."""
+    import yt_dlp
+    opts = ytdl_opts(skip_download=True, writesubtitles=True, subtitleslangs=["live_chat"], outtmpl=str(outtmpl))
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+    except Exception as e:  # chat is optional
+        print(f"chat replay unavailable: {str(e)[:160]}", flush=True)
 
 
 def stop_requested():
@@ -78,7 +165,8 @@ def is_url(s):
 def job_dir(src):
     key = hashlib.sha1(src.encode()).hexdigest()[:8]
     stem = re.sub(r"[^a-z0-9]+", "-", Path(src).stem.lower() if not is_url(src) else src.split("v=")[-1].split("/")[-1].lower())[:24].strip("-")
-    d = JOBS / f"{stem or 'job'}-{key}"
+    jobs = Path(os.environ.get("CLIP_DESK_HOME", ROOT)) / "jobs"  # read each time: the app can switch workspace
+    d = jobs / f"{stem or 'job'}-{key}"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -90,13 +178,17 @@ def run_ffmpeg(cmd, duration, label="encoded"):
     import threading
     err = []
     t = threading.Thread(target=lambda: err.extend(p.stderr), daemon=True); t.start()
-    for line in p.stdout:
-        if line.startswith("out_time_us=") or line.startswith("out_time_ms="):
-            try:
-                sec = int(line.split("=", 1)[1]) / 1e6
-            except ValueError:
-                continue
-            progress(min(max(sec, 0), duration), duration, label)
+    try:
+        for line in p.stdout:
+            if line.startswith("out_time_us=") or line.startswith("out_time_ms="):
+                try:
+                    sec = int(line.split("=", 1)[1]) / 1e6
+                except ValueError:
+                    continue
+                progress(min(max(sec, 0), duration), duration, label)
+    finally:
+        if p.poll() is None and CANCEL_CHECK is not None and CANCEL_CHECK():
+            p.kill()
     p.wait(); t.join(2)
     if p.returncode != 0:
         sys.exit(f"command failed ({p.returncode}): {' '.join(map(str, cmd))[:200]}\n{''.join(err)[-1500:]}")

@@ -143,7 +143,9 @@ class Handler(BaseHTTPRequestHandler):
                                "settings": core.SETTINGS.public(), "workspace": str(core.SETTINGS.workspace),
                                "platform": sys.platform, "frozen": core.FROZEN, "bin": str(core.bin_dir()),
                                "models": core.WHISPER_MODELS, "installed_models": core.installed_models(),
-                               "first_run": not core.SETTINGS.data.get("model_choice_done") and not core.installed_models()})
+                               "android": core.IS_ANDROID,
+                               "first_run": (not core.IS_ANDROID and not core.SETTINGS.data.get("model_choice_done")
+                                             and not core.installed_models())})
         if path == "/api/events":
             return self._events()
         if path == "/api/tasks":
@@ -184,6 +186,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._err(400, "Paste a single video URL or file path.")
                 if not src.startswith(("http://", "https://")) and not Path(src).expanduser().is_file():
                     return self._err(400, f"Not a video URL and no such file: {src[:120]}")
+            if core.IS_ANDROID and kind in ("live", "install_ffmpeg", "install_model"):
+                return self._err(400, "Not available in the Android app (use the Windows app for this).")
             if kind == "live" and not p["url"].startswith(("http://", "https://")):
                 return self._err(400, "Live mode needs a stream URL (https://...).")
             if kind in ("moments", "pipeline", "cut", "live") and not core.find_tool("ffmpeg"):
@@ -208,6 +212,8 @@ class Handler(BaseHTTPRequestHandler):
             core.SETTINGS.update(**{k: v for k, v in b.items() if k in core.Settings.DEFAULTS})
             return self._json({"settings": core.SETTINGS.public(), "workspace": str(core.SETTINGS.workspace)})
         if path == "/api/open":
+            if core.IS_ANDROID:
+                return self._err(400, "Use Share or Save to gallery on Android.")
             target = Path(b.get("path") or core.SETTINGS.workspace)
             if not _inside(target, core.SETTINGS.workspace) and target.resolve() != core.bin_dir().resolve():
                 return self._err(400, "outside workspace")

@@ -19,9 +19,11 @@
 
 ---
 
-## Vice Desk: the Windows app (no Claude Code needed)
+## Vice Desk: Windows and Android apps (no Claude Code needed)
 
-**[Download ViceDesk.exe from Releases](https://github.com/Anurag123rk/claudeGTA6/releases/latest)**, double-click it, done. No Python, no login, no cloud backend.
+**[Download from Releases](https://github.com/Anurag123rk/claudeGTA6/releases/latest)**: `ViceDesk.exe` for Windows (double-click it) or `ViceDesk-<version>.apk` for Android 10+ (open it on your phone and allow installing). No Python, no login, no cloud backend.
+
+The Android app runs the same pipeline on your phone (no captions there: the speech engine has no Android build). Share a YouTube/Twitch link to it, then share the finished clip straight to TikTok, Instagram or YouTube. It's built from [`android/`](android) with Chaquopy.
 
 - **Paste a video, get clips.** The full pipeline runs in one click: download → transcribe → score moments → cut 1080x1920 clips → rule check.
 - **Live monitor.** Step, stage and overall progress for every task, with **live download speed**, ETA, a speed graph and the full log.

@@ -3,3 +3,4 @@
 truststore>=0.9
 pywebview>=5.3; sys_platform == "win32"
 pyinstaller>=6.11
+deno>=2.9.8  # JavaScript runtime yt-dlp needs for YouTube; copied next to ffmpeg in the .exe

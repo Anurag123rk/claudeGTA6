@@ -6,11 +6,11 @@ Writes jobs/<id>/candidates.md + candidates.json.
 
 usage: python moments.py <url-or-file> [--top 8] [--min 15] [--max 40] [--chat chat.json] [--max-minutes 90]
 """
-import argparse, json, math, re, sys, wave
+import argparse, json, math, os, re, sys, wave
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
-from common import ffprobe, is_url, job_dir, load_json, progress, run, save_json, stage, tool, ytdlp_base, ytdlp_json
+from common import ffprobe, is_url, job_dir, load_json, progress, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
 
 HYPE = re.compile(r"\b(no way|oh my god|omg|what|wait|bro|let'?s go|holy|insane|crazy|yo+|wtf|dude|look at|nah|run|go go)\b", re.I)
 CHAT_HYPE = re.compile(r"(LMAO|LOL|KEKW|OMEGALUL|W+\b|CLIP|💀|😂|🔥|NO WAY|HOLY)", re.I)
@@ -20,19 +20,23 @@ def fetch(src, d, max_min):
     info = {}
     if is_url(src):
         stage(1, 5, "Reading video info")
-        info = ytdlp_json(src)
+        try:
+            info = ytdl_info(src)
+        except Exception as e:
+            sys.exit(f"could not read this video: {str(e).replace('ERROR: ', '')[:300]}")
         save_json(d / "info.json", {k: info.get(k) for k in ("id", "title", "uploader", "channel", "uploader_id", "webpage_url",
                                                              "duration", "view_count", "upload_date", "heatmap", "is_live", "was_live")})
+        if info.get("is_live"):
+            sys.exit("this video is live right now: use Live mode to record it, or wait until it has ended")
         vid = d / "source.mp4"
         stage(2, 5, "Downloading video")
         if not vid.exists():
-            args = ytdlp_base(progress=True) + ["-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080]/b", "--merge-output-format", "mp4",
-                                   "-o", str(vid)]
-            if (info.get("duration") or 0) > max_min * 60:
-                args += ["--download-sections", f"*0-{max_min * 60}"]
-            run(args + [src])
-        if info.get("was_live") and not (d / "chat.json").exists():  # YouTube chat replay
-            run(ytdlp_base() + ["--skip-download", "--write-subs", "--sub-langs", "live_chat", "-o", str(d / "chat"), src], check=False)
+            h = int(os.environ.get("VICE_MAX_HEIGHT") or 1080)  # the Android app asks for 720p
+            fmt = f"bv*[height<={h}][ext=mp4]+ba[ext=m4a]/bv*[height<={h}]+ba/b[height<={h}]/b"
+            long = (info.get("duration") or 0) > max_min * 60
+            ytdl_download(src, vid, fmt, max_seconds=max_min * 60 if long else None)
+        if info.get("was_live") and not list(d.glob("chat*.live_chat.json")):  # YouTube chat replay
+            ytdl_chat_replay(src, d / "chat")
     else:
         stage(2, 5, "Using local file")
         vid = Path(src).resolve()
@@ -59,7 +63,11 @@ def transcribe(wav, d):
     stage(4, 5, "Transcribing speech")
     if out.exists():
         return load_json(out)
-    from faster_whisper import WhisperModel
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:  # e.g. the Android app: no speech engine, score on loudness/heatmap/chat only
+        print("speech engine not available here: scoring without a transcript (no captions)", flush=True)
+        return []
     try:
         import ctranslate2
         cuda = ctranslate2.get_cuda_device_count() > 0

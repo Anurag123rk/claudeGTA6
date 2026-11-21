@@ -4,6 +4,8 @@
 const T = window.DESK_TOKEN;
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const AND = window.ViceAndroid || null; // bridge injected by the Android app
+if (AND) document.body.classList.add("android");
 const S = { tasks: [], status: null, jobs: [], selTask: null, watch: {}, prevStates: {}, net: [], findTab: "trends" };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -37,10 +39,27 @@ function go(page) {
 $$("#nav a").forEach((a) => a.addEventListener("click", () => go(a.dataset.page)));
 document.addEventListener("click", (e) => {
   const g = e.target.closest("[data-goto]"); if (g) { e.preventDefault(); go(g.dataset.goto); }
-  const ext = e.target.closest("a[data-ext]"); if (ext) { e.preventDefault(); api("/api/open-url", { url: ext.dataset.ext }).catch((er) => toast(esc(er.message))); }
-  const op = e.target.closest("[data-open]"); if (op) { e.preventDefault(); api("/api/open", { path: op.dataset.open }).catch((er) => toast(esc(er.message))); }
+  const ext = e.target.closest("a[data-ext]");
+  if (ext) { e.preventDefault(); if (AND) AND.openUrl(ext.dataset.ext); else api("/api/open-url", { url: ext.dataset.ext }).catch((er) => toast(esc(er.message))); }
+  const op = e.target.closest("[data-open]");
+  if (op) { e.preventDefault(); if (AND) toast("Use Share or Save on a clip."); else api("/api/open", { path: op.dataset.open }).catch((er) => toast(esc(er.message))); }
+  const sh = e.target.closest("[data-share]"); if (sh && AND) { e.preventDefault(); AND.shareFile(sh.dataset.share); }
+  const sv = e.target.closest("[data-save]"); if (sv && AND) { e.preventDefault(); AND.saveToGallery(sv.dataset.save); }
+  const pk = e.target.closest("[data-pick]"); if (pk && AND) { e.preventDefault(); S.pickTarget = pk.dataset.pick; AND.pickVideo(); }
   const pl = e.target.closest("[data-play]"); if (pl) { e.preventDefault(); play(pl.dataset.play, pl.dataset.name); }
 });
+
+window.onPickedVideo = (path) => {
+  const f = $((S.pickTarget || "#pipeForm") + " [name=src]"); if (f) f.value = path;
+  toast("Video ready: " + esc(path.split("/").pop()));
+};
+window.onAndroidMessage = (msg) => toast(esc(msg));
+window.onSharedUrl = (url) => { go("pipeline"); $("#pipeForm [name=src]").value = url; toast("Link received. Tap <b>Run full pipeline</b>."); };
+window.onAndroidBack = () => {
+  const d = $("#player"); if (d.open) { $("#closePlayer").click(); return true; }
+  if (!$("#page-dashboard").classList.contains("on")) { go("dashboard"); return true; }
+  return false;
+};
 
 // ---------------------------------------------------------------- live monitor (SSE + polling fallback)
 function connect() {
@@ -192,6 +211,7 @@ async function run(kind, params, slot) {
 async function loadStatus() {
   try {
     const s = await api("/api/status", null, 8000); S.status = s;
+    document.body.classList.toggle("android", !!s.android);
     $("#ver").textContent = `v${s.version} · local`;
     $("#about").innerHTML = `Vice Desk ${esc(s.version)}. Runs the claudeGTA6 pipeline locally, with no login and no cloud backend. Tools folder: <span class="mono">${esc(s.bin)}</span>. You approve every post; nothing is uploaded.`;
     $("#wsLink").textContent = s.workspace; $("#wsLink").dataset.open = s.workspace;
@@ -207,7 +227,7 @@ async function loadStatus() {
         ? `<span><b>ffmpeg is needed</b> to cut clips. One click downloads it (about 100 MB); you'll see the download speed live.</span><button class="primary" id="instFF">Install ffmpeg</button>`
         : `<span><b>ffmpeg is missing.</b> Install it with your package manager (<code>sudo apt install ffmpeg</code> / <code>brew install ffmpeg</code>), then restart.</span>`;
       const btn = $("#instFF"); if (btn) btn.onclick = () => run("install_ffmpeg", {});
-    } else if (!(s.installed_models || []).length) {
+    } else if (!s.android && !(s.installed_models || []).length) {
       b.hidden = false;
       b.innerHTML = `<span><b>No speech model yet.</b> Clips are cut without captions until you download one.</span><button class="primary" id="pickModel">Choose model</button>`;
       $("#pickModel").onclick = () => { $("#firstRun").hidden = false; };
@@ -251,7 +271,9 @@ function setFindTab(tab) {
   $$("#findForm [data-only]").forEach((el) => (el.hidden = el.dataset.only !== tab));
 }
 $$("#findTabs button").forEach((b) => b.addEventListener("click", () => { setFindTab(b.dataset.tab); loadFind(b.dataset.tab); }));
-$("#findForm").addEventListener("submit", (e) => { e.preventDefault(); run(S.findTab, formData(e.target), "findTask"); });
+$("#findForm").addEventListener("submit", (e) => {
+  e.preventDefault(); const d = formData(e.target); d.deep = e.target.elements.deep.checked ? "1" : ""; run(S.findTab, d, "findTask");
+});
 
 function parseMd(md) {
   const sections = []; let cur = { title: "", rows: [], head: null, notes: [] };
@@ -330,7 +352,9 @@ $("#liveForm").addEventListener("submit", (e) => { e.preventDefault(); run("live
 function clipCard(c) {
   return `<div class="clip"><video preload="metadata" muted src="${fileUrl(c.file)}#t=0.5" data-play="${esc(c.file)}" data-name="${esc(c.name)}"></video>
     <div class="ci"><b>${esc(c.name)}</b><span class="muted">${fmtBytes(c.size)}${c.layout ? " · " + esc(c.layout) : ""}</span>${c.hook ? `<br>${esc(c.hook)}` : ""}
-    <div class="acts" style="margin-top:6px"><button class="sm" data-check="${esc(c.file)}">Check</button><button class="sm" data-open="${esc(c.file)}">Open</button></div></div></div>`;
+    <div class="acts" style="margin-top:6px;flex-wrap:wrap"><button class="sm" data-check="${esc(c.file)}">Check</button>${AND
+      ? `<button class="sm primary" data-share="${esc(c.file)}">Share</button><button class="sm" data-save="${esc(c.file)}">Save</button>`
+      : `<button class="sm" data-open="${esc(c.file)}">Open</button>`}</div></div></div>`;
 }
 async function loadJobs(quiet) {
   try {

@@ -16,7 +16,7 @@
       <a data-page="dashboard" class="on"><i>◉</i>Dashboard</a>
       <a data-page="find"><i>⌕</i>Find videos</a>
       <a data-page="pipeline"><i>▶</i>Pipeline</a>
-      <a data-page="live"><i>●</i>Live mode</a>
+      <a data-page="live" class="desk-only"><i>●</i>Live mode</a>
       <a data-page="library"><i>▤</i>Clips &amp; jobs</a>
       <a data-page="monitor"><i>≋</i>Monitor <span class="pill" id="runCount" hidden>0</span></a>
       <a data-page="settings"><i>⚙</i>Settings</a>
@@ -34,7 +34,7 @@
       <header class="hero">
         <div>
           <h1>Clip control room</h1>
-          <p>Paste a GTA 6 video or VOD. Vice Desk downloads it, finds the best moments, cuts vertical clips with captions and checks them. Everything runs on this PC, with no account needed.</p>
+          <p>Paste a GTA 6 video or VOD. Vice Desk downloads it, finds the best moments, cuts vertical clips with captions and checks them. Everything runs on this device, with no account needed.</p>
         </div>
       </header>
       <div id="setupBanner" class="banner" hidden></div>
@@ -49,7 +49,7 @@
               <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             </div>
             <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
-            <div class="row end"><button class="primary" type="submit">Run full pipeline</button></div>
+            <div class="row end"><button type="button" class="android-only" data-pick="#quickForm">Pick video from phone</button><button class="primary" type="submit">Run full pipeline</button></div>
           </form>
         </div>
         <div class="card">
@@ -77,6 +77,7 @@
           <label class="grow">Search<input name="query" value="gta 6"></label>
           <label data-only="trends">Last hours<input name="hours" type="number" min="1" max="168" value="24"></label>
           <label>Max results<input name="limit" type="number" min="5" max="60" value="30"></label>
+          <label data-only="trends" class="chk"><span><input type="checkbox" name="deep" checked> Check "most replayed" on the top 8</span></label>
           <button class="primary" type="submit">Search</button>
         </form>
         <div id="findTask" class="tasks"></div>
@@ -107,6 +108,7 @@
           </div>
           <label>Post caption (checked for banned words and campaign hashtags)<input name="caption" placeholder="#GTA6 credit @creator"></label>
           <div class="row end">
+            <button type="button" class="android-only" data-pick="#pipeForm">Pick video from phone</button>
             <button type="button" id="momentsOnly">Find moments only</button>
             <button class="primary" type="submit">Run full pipeline</button>
           </div>
@@ -137,7 +139,7 @@
 
     <!-- LIBRARY -->
     <section class="page" id="page-library">
-      <div class="card-h"><h1>Clips &amp; jobs</h1><div><button id="openWs">Open folder</button> <button id="refreshJobs">Refresh</button></div></div>
+      <div class="card-h"><h1>Clips &amp; jobs</h1><div><button id="openWs" class="desk-only">Open folder</button> <button id="refreshJobs">Refresh</button></div></div>
       <div id="jobs"><p class="muted">Loading…</p></div>
     </section>
 
@@ -155,8 +157,8 @@
       <h1>Settings</h1>
       <div class="card">
         <form id="setForm" class="stack">
-          <label>Workspace folder (jobs, clips and reports go here)<input name="workspace" class="mono"></label>
-          <div class="row">
+          <label class="desk-only">Workspace folder (jobs, clips and reports go here)<input name="workspace" class="mono"></label>
+          <div class="row desk-only">
             <label class="grow">Speech model (captions)<select name="whisper_model"></select></label>
             <button type="button" id="dlModel">Download this model</button>
           </div>
@@ -177,7 +179,7 @@
       <div class="card">
         <h2>About</h2>
         <p class="muted small" id="about"></p>
-        <div class="row"><button id="quitBtn" class="danger">Quit Vice Desk</button></div>
+        <div class="row desk-only"><button id="quitBtn" class="danger">Quit Vice Desk</button></div>
       </div>
     </section>
   </main>
