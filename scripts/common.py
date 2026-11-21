@@ -151,13 +151,52 @@ def ytdl_download(url, out, fmt, max_seconds=None):
         from yt_dlp.utils import download_range_func
         opts["download_ranges"] = download_range_func([], [[0, max_seconds]])
         opts["force_keyframes_at_cuts"] = False
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            rc = ydl.download([url])
-    except yt_dlp.utils.DownloadError as e:
-        sys.exit(f"download failed: {str(e).replace('ERROR: ', '')[:400]}")
-    if rc:
-        sys.exit("download failed (see log)")
+    # YouTube sometimes refuses one player client with HTTP 403 (or hides its formats) while others work,
+    # especially on phones and mobile data: try the default first, then other clients.
+    last = ""
+    for clients in YT_CLIENT_FALLBACKS:
+        o = dict(opts)
+        if clients:
+            o["extractor_args"] = {"youtube": {"player_client": clients}}
+            print(f"YouTube refused that route; trying the {'/'.join(clients)} player", flush=True)
+        try:
+            with yt_dlp.YoutubeDL(o) as ydl:
+                rc = ydl.download([url])
+            if not rc:
+                return
+            last = "download failed (see log)"
+        except yt_dlp.utils.DownloadError as e:
+            last = str(e).replace("ERROR: ", "")
+            is_youtube = "youtube.com" in url or "youtu.be" in url
+            if not (_refused(last) and is_youtube):
+                break  # other errors (or other sites) are not fixed by switching YouTube player clients
+        _drop_partials(out)
+    if "403" in last or "Forbidden" in last:
+        sys.exit("download failed: YouTube refused the download (HTTP 403) on every player route [needs-cookies]. "
+                 "Sign in under Settings > YouTube sign-in, or try again later / on Wi-Fi, then press Retry.")
+    sys.exit(f"download failed: {last[:400]}")
+
+
+YT_CLIENT_FALLBACKS = [None, ["tv", "web_safari"], ["android_vr"], ["mweb"]]
+
+
+def _refused(msg):
+    m = msg.lower()
+    return "403" in m or "forbidden" in m or "format is not available" in m or "only images are available" in m
+
+
+def _drop_partials(out):
+    """A refused download can leave fragments (.part, .ytdl, per-format .fNNN files) the next player route
+    would not reuse: remove them, but never the finished output."""
+    out = Path(out)
+    for f in out.parent.glob(out.stem + ".*"):
+        if f == out:
+            continue
+        if f.name.endswith((".part", ".ytdl")) or ".part-" in f.name or re.search(r"\.f\d+\.", f.name):
+            try:
+                f.unlink()
+            except OSError:
+                pass
 
 
 def ytdl_chat_replay(url, outtmpl):
@@ -250,7 +289,8 @@ def retry(fn, what, attempts=3, wait=5):
             return fn()
         except (SystemExit, Exception) as e:  # yt-dlp failures surface as SystemExit (ytdl_download) or exceptions
             msg = str(e.code if isinstance(e, SystemExit) else e)
-            if msg == "cancelled" or k == attempts or is_bot_check(msg) or "format is not available" in msg:
+            if (msg == "cancelled" or k == attempts or is_bot_check(msg) or "format is not available" in msg
+                    or "every player route" in msg):
                 raise  # retrying cannot fix these
             print(f"{what} failed ({msg[:160]}); retrying in {wait * k}s ({k}/{attempts - 1})", flush=True)
             for _ in range(wait * k):

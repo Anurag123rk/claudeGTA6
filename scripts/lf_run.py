@@ -13,7 +13,7 @@ Stages (each saved under <project>/, so a re-run reuses what is finished):
 usage: python lf_run.py --project DIR [--topic "..."] [--idea outliers|own] [--minutes 8]
                         [--footage "url1,url2"] [--voice auto|elevenlabs|free|none] [--fresh]
 """
-import argparse, json, re, statistics, sys, time
+import argparse, json, os, re, statistics, sys, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -240,7 +240,8 @@ def footage(d, urls):
         if not urls:
             sys.exit("no official footage found: paste official trailer/gameplay URLs in the Long-form form")
     for i, u in enumerate(urls[:4]):
-        ytdl_download(u, fd / f"src_{i}.mp4", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080]/b")
+        h = int(os.environ.get("VICE_MAX_HEIGHT") or 1080)  # 720 on phones: lighter and less often refused
+        ytdl_download(u, fd / f"src_{i}.mp4", f"bv*[height<={h}][ext=mp4]+ba[ext=m4a]/bv*[height<={h}]+ba/b[height<={h}]/b")
         progress(i + 1, len(urls[:4]), "official videos downloaded")
     return sorted(fd.glob("src_*.mp4"))
 
