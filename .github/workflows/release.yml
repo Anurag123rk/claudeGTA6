@@ -116,7 +116,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: android-actions/setup-android@v3
+      # ubuntu-latest ships the Android SDK (ANDROID_HOME) with licenses accepted; AGP installs missing parts
+      - name: Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
       - uses: gradle/actions/setup-gradle@v4
         with:
