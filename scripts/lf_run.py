@@ -17,7 +17,7 @@ import argparse, json, os, re, statistics, sys, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import progress, run, stage, tool, ytdl_download, ytdl_search  # noqa: E402
+from common import media_ok, progress, run, stage, tool, ytdl_download, ytdl_search  # noqa: E402
 
 N = 8  # stages
 
@@ -228,21 +228,32 @@ def voice(d, script, mode):
 
 
 # ---------------------------------------------------------------- 6 footage
-def footage(d, urls):
+def footage(d, urls, need_seconds=480):
+    """Official footage only. Downloads just enough of each video to cover the narration (not whole videos)."""
     fd = d / "footage"
     fd.mkdir(parents=True, exist_ok=True)
+    for f in fd.glob("src_*.mp4"):
+        if not media_ok(f):  # an interrupted earlier run
+            f.unlink()
     have = sorted(fd.glob("src_*.mp4"))
     if have:
         return have
     if not urls:  # official only: Rockstar Games' own channel
+        say("finding official Rockstar Games videos")
         res = ytdl_search("https://www.youtube.com/results?search_query=grand+theft+auto+vi+trailer+rockstar+games", 15)
         urls = [e["url"] for e in res if (e.get("channel") or "").lower().strip() == "rockstar games"][:2]
         if not urls:
             sys.exit("no official footage found: paste official trailer/gameplay URLs in the Long-form form")
-    for i, u in enumerate(urls[:4]):
-        h = int(os.environ.get("VICE_MAX_HEIGHT") or 1080)  # 720 on phones: lighter and less often refused
-        ytdl_download(u, fd / f"src_{i}.mp4", f"bv*[height<={h}][ext=mp4]+ba[ext=m4a]/bv*[height<={h}]+ba/b[height<={h}]/b")
-        progress(i + 1, len(urls[:4]), "official videos downloaded")
+    urls = urls[:4]
+    # each source is reused across chapters: about the narration length split across sources, plus a margin
+    per = int(min(600, max(90, need_seconds / len(urls) + 45)))
+    h = int(os.environ.get("VICE_MAX_HEIGHT") or 1080)  # 720 on phones: lighter and less often refused
+    for i, u in enumerate(urls):
+        say(f"official video {i + 1} of {len(urls)}: {u} (first {per // 60}:{per % 60:02d})")
+        out = fd / f"src_{i}.mp4"
+        ytdl_download(u, out, f"bv*[height<={h}][ext=mp4]+ba[ext=m4a]/bv*[height<={h}]+ba/b[height<={h}]/b", max_seconds=per)
+        say(f"  done: {out.stat().st_size / 1e6:.1f} MB" if out.exists() else "  done")
+        progress(i + 1, len(urls), "official videos downloaded")
     return sorted(fd.glob("src_*.mp4"))
 
 
@@ -316,9 +327,9 @@ def publish(d, script, chapters_at, draft, sources):
     pd.mkdir(parents=True, exist_ok=True)
     stamp = lambda t: f"{int(t // 60)}:{int(t % 60):02d}"
     chapters = "\n".join(f"{stamp(t)} {h}" for t, h in chapters_at)
-    sources = sorted({c.get("source", "") for c in script.get("claims", []) if c.get("status") in ("official", "measured") and c.get("source")})
+    cites = sorted({c.get("source", "") for c in script.get("claims", []) if c.get("status") in ("official", "measured") and c.get("source")})
     desc = (script.get("description", "").strip() + "\n\nChapters\n" + chapters +
-            ("\n\nSources\n" + "\n".join(sources) if sources else "") + "\n\nFootage: official Rockstar Games trailers and gameplay.\n")
+            ("\n\nSources\n" + "\n".join(cites) if cites else "") + "\n\nFootage: official Rockstar Games trailers and gameplay.\n")
     (pd / "title.txt").write_text(script.get("title", "").strip() + "\n", encoding="utf-8")
     (pd / "description.txt").write_text(desc, encoding="utf-8")
     words = " ".join(str(script.get("thumbnail_words", "")).split()[:3]).upper()
@@ -368,7 +379,9 @@ def main():
     stage(5, N, "Voice-over")
     voices = voice(rd, script, a.voice)
     stage(6, N, "Official footage")
-    sources = footage(rd, [u.strip() for u in a.footage.replace("\n", ",").split(",") if u.strip()])
+    words = len((script.get("cold_open", "") + " " + " ".join(c.get("narration", "") for c in script.get("chapters", []))).split())
+    sources = footage(rd, [u.strip() for u in a.footage.replace("\n", ",").split(",") if u.strip()],
+                      need_seconds=max(60, words / 2.5))
     stage(7, N, "Building the rough cut")
     draft, chapters_at = build(rd, script, voices, sources)
     stage(8, N, "Title, description, thumbnail")

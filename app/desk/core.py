@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.2.4"
+VERSION = "2.2.5"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -497,12 +497,18 @@ def handle_line(t, line):
         total = tot or est
         prev = t.download or {}
         part = prev.get("part", 1)
-        if prev.get("bytes") and dl is not None and dl + 1e6 < prev["bytes"] * 0.5:
-            part += 1  # yt-dlp moved on to the next file (video, then audio)
+        if prev.get("status") == "finished" and status != "finished":
+            part += 1  # yt-dlp finished one file and started the next (video, then audio)
+        fm = re.match(r"frag_(\d+)/(\d+)", status or "")
         t.download = {"bytes": dl, "total": total, "speed": sp or 0, "eta": eta, "part": part, "source": "yt-dlp",
                       "status": status}
-        t.stage_frac = (dl / total) if (dl is not None and total) else t.stage_frac
-        t.detail = f"{fmt_bytes(dl)} of {fmt_bytes(total)}" + (f" (file {part})" if part > 1 else "") if total else fmt_bytes(dl)
+        if fm:  # fragmented stream: the fragment count is the reliable progress, sizes are per-fragment estimates
+            fi, fc = int(fm.group(1)), int(fm.group(2))
+            t.stage_frac = fi / fc if fc else t.stage_frac
+            t.detail = f"piece {fi} of {fc}" + (f" (file {part})" if part > 1 else "")
+        else:
+            t.stage_frac = (dl / total) if (dl is not None and total) else t.stage_frac
+            t.detail = f"{fmt_bytes(dl)} of {fmt_bytes(total)}" + (f" (file {part})" if part > 1 else "") if total else fmt_bytes(dl)
         t._last_vprog = time.time()
         t.touch()
         return

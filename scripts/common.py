@@ -142,8 +142,9 @@ def ytdl_download(url, out, fmt, max_seconds=None):
         check_cancel()
         if d.get("status") in ("downloading", "finished"):
             n = lambda k: "NA" if d.get(k) is None else d.get(k)
+            frag = f"frag {d['fragment_index']}/{d['fragment_count']}" if d.get("fragment_count") else (d.get("status") or "")
             print(f"[VPROG] {n('downloaded_bytes')}|{n('total_bytes')}|{n('total_bytes_estimate')}|{n('speed')}|"
-                  f"{n('eta')}|{d.get('status')}", flush=True)
+                  f"{n('eta')}|{frag.replace(' ', '_') if d.get('status') == 'downloading' else d.get('status')}", flush=True)
 
     opts = ytdl_opts(format=fmt, outtmpl=str(out), merge_output_format="mp4", progress_hooks=[hook],
                      concurrent_fragment_downloads=4, noprogress=True)

@@ -1,11 +1,17 @@
-## Vice Desk 2.2.4: Windows, macOS, Linux and Android
+## Vice Desk 2.2.5: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.4-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.4-linux-x86_64` | `chmod +x ViceDesk-2.2.4-linux-x86_64 && ./ViceDesk-2.2.4-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.4.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.5-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.5-linux-x86_64` | `chmod +x ViceDesk-2.2.5-linux-x86_64 && ./ViceDesk-2.2.5-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.5.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.5
+- **Long-form "Official footage" looked stuck** (e.g. "475.4 KB of 475.4 KB (file 3)"). YouTube sends video in many small pieces; progress now shows "piece 12 of 180" and the file counter only moves on when a whole file is finished.
+- Long-form now downloads only as much official footage as the narration needs (a few minutes per video, not whole trailers), so this step is much faster on phones. The log shows "official video 1 of 2 … done: 84 MB" as each one finishes.
+- A half-downloaded footage file from an interrupted run is thrown away and fetched again instead of breaking the build.
+- The final "Title, description, thumbnail" step no longer fails trying to take the thumbnail from a web link; it uses the downloaded footage.
 
 ### Fixed in 2.2.4
 - **YouTube "HTTP Error 403: Forbidden" during downloads** (seen in long-form footage on phones). When YouTube refuses one way of downloading, Vice Desk now tries other player routes (TV/Safari, Android VR, mobile web) before giving up, and cleans up the half-downloaded pieces. This applies to clip and long-form downloads alike.
