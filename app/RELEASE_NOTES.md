@@ -1,14 +1,16 @@
-## Vice Desk 2.0.4: Windows, macOS, Linux and Android
+## Vice Desk 2.0.5: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.4-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.0.4-linux-x86_64` | `chmod +x ViceDesk-2.0.4-linux-x86_64 && ./ViceDesk-2.0.4-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.4.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.5-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.0.5-linux-x86_64` | `chmod +x ViceDesk-2.0.5-linux-x86_64 && ./ViceDesk-2.0.5-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.5.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### New in 2.0.5
+- **Retry button.** Every failed or stopped task gets **↻ Retry**, which runs it again with the same settings and continues from where it stopped: a finished download is reused, a partial one resumes, the transcript and moments are kept, and clips already cut with the same settings are skipped. Clips are now written under a temporary name, so a stopped encode can never pass for a finished clip.
 
 ### Fixed in 2.0.4
-- **Retry button.** Every failed or stopped task gets **↻ Retry**, which runs it again with the same settings and continues from where it stopped: a finished download is reused, a partial one resumes, the transcript and moments are kept, and clips already cut with the same settings are skipped. Clips are now written under a temporary name, so a stopped encode can never pass for a finished clip.
 - **Downloads keep going when you switch apps (Android).** While a task runs, Vice Desk shows a progress notification and keeps the CPU and Wi-Fi awake, so Android no longer freezes the download. The keep-alive is released when the last task finishes. Allow notifications when asked to see the progress; the work continues either way.
 - **A cut-off download is never reused.** Videos download to a temporary file and only become `source.mp4` once they are complete and readable. A damaged leftover from an earlier run is detected and downloaded again, which fixes "Invalid data found when processing input". Network drops are retried up to 3 times and resume where they stopped, and audio extraction is crash-safe too.
 - Reading video info is retried when the network is briefly unavailable ("Failed to resolve www.youtube.com").
