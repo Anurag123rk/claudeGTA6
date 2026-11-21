@@ -10,7 +10,7 @@
 ### Fixed in 2.0.2 (Android)
 - **ffmpeg "CANNOT LINK EXECUTABLE … too small to be an ELF executable".** ffmpeg's libraries were unpacked with their version links (`libavdevice.so.61 → libavdevice.so.61.3.100`) saved as tiny text files, and a few runtime libraries it needs (libc++_shared, libcrypto, libexpat) were missing. Both are fixed, and the build now refuses to publish an APK where ffmpeg can't find any of its 81 libraries.
 - On Android, the "ffmpeg is missing" banner no longer suggests `apt`/`brew`; it shows the actual error.
-- 2.0.1 → 2.0.2 installs as an update (same signing key as long as you keep this build). If Android refuses, uninstall first.
+- **Uninstall the previous Vice Desk before installing.** Each build is signed with a new key, so Android won't update over it.
 
 ### Fixed in 2.0.1 (Android)
 - **"ffmpeg is not installed" when downloading.** The phone app shipped a generic Linux ffmpeg that cannot run inside an Android app. It now uses Android builds of ffmpeg, ffprobe and QuickJS (from youtubedl-android, the same binaries the Seal and YTDLnis apps use). This ffmpeg includes libass, so the hook box renders on phones too, using Android's system fonts.
