@@ -190,6 +190,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, "Not available in the Android app (use the Windows app for this).")
             if kind == "live" and not p["url"].startswith(("http://", "https://")):
                 return self._err(400, "Live mode needs a stream URL (https://...).")
+            if kind in ("moments", "pipeline", "cut", "live"):
+                st = core.tool_status()
+                if not st["ffmpeg"]["ok"] or not st["ffprobe"]["ok"]:
+                    bad = st["ffmpeg"] if not st["ffmpeg"]["ok"] else st["ffprobe"]
+                    return self._err(400, f"ffmpeg cannot run on this device: {bad['path']}")
             if kind in ("moments", "pipeline", "cut", "live") and not core.find_tool("ffmpeg"):
                 return self._err(400, "ffmpeg is not installed yet. Install it from the Dashboard first.")
             title = {"trends": "Trend radar: " + (p.get("query") or "gta 6"),

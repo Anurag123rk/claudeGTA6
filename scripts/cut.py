@@ -8,7 +8,7 @@ usage: python cut.py jobs/<id> --pick 1 [--layout fill|blur|facecam|react] [--ho
                      [--punch 0.15] [--clean-audio] [--fps 30|60]
 Also writes clip_<n>.srt and clip_<n>.ass next to the clip, for finishing touches in Kdenlive, Shotcut or OpenCut.
 """
-import argparse, sys
+import argparse, os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from common import load_json, run_ffmpeg, save_json, stage, tool
@@ -183,6 +183,9 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{int(H * 0.38)}:force_original_aspect_ratio=increase,"
              f"crop={W}:{int(H * 0.38)}[cam];[b]scale=-2:{H - int(H * 0.38)},crop={W}:{H - int(H * 0.38)}[game];[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
+    fonts = os.environ.get("VICE_FONTS_DIR")
+    if fonts:
+        sub += "':fontsdir='" + fonts.replace(":", "\\:")
     zoom = punch_filter(*punch) if punch else ""
     # 60 fps: motion-compensated interpolation (a CPU stand-in for RIFE); slow, so it is opt-in
     rate = "fps=30" if fps != 60 else "minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"

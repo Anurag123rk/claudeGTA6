@@ -1,11 +1,16 @@
-## Vice Desk 2.0.0: Windows, macOS, Linux and Android
+## Vice Desk 2.0.1: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.0-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.0.0-linux-x86_64` | `chmod +x ViceDesk-2.0.0-linux-x86_64 && ./ViceDesk-2.0.0-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.0.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.1-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.0.1-linux-x86_64` | `chmod +x ViceDesk-2.0.1-linux-x86_64 && ./ViceDesk-2.0.1-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.1.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.0.1 (Android)
+- **"ffmpeg is not installed" when downloading.** The phone app shipped a generic Linux ffmpeg that cannot run inside an Android app. It now uses Android builds of ffmpeg, ffprobe and QuickJS (from youtubedl-android, the same binaries the Seal and YTDLnis apps use). This ffmpeg includes libass, so the hook box renders on phones too, using Android's system fonts.
+- **Uninstall the old Vice Desk first.** This build is signed with a different key, so Android won't install it over 2.0.0. Your clips saved to the gallery stay.
+- The app tests its tools at startup. If one can't run on your phone, the Setup card shows the exact error, and the pipeline stops before downloading instead of failing halfway.
 
 ### New in 2.0.0
 - **Clip studio steps** ("VOD → find the reaction → cut → punch in → caption → ship"):

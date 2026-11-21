@@ -203,17 +203,23 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Fetch static arm64 tools (ffmpeg, ffprobe, QuickJS)
+      # Android builds of ffmpeg/ffprobe (with libass, x264) and QuickJS from youtubedl-android, the same
+      # binaries the Seal and YTDLnis apps ship. Generic Linux builds cannot run inside an Android app.
+      - name: Fetch Android tools (ffmpeg, ffprobe, QuickJS)
+        env:
+          YTDLA: https://repo.maven.apache.org/maven2/io/github/junkfood02/youtubedl-android
+          YTDLA_VERSION: "0.18.1"
         run: |
           set -e
           L=android/app/src/main/jniLibs/arm64-v8a
-          mkdir -p $L
-          curl -fsSL -o $L/libffmpeg.so  https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffmpeg-linux-arm64
-          curl -fsSL -o $L/libffprobe.so https://github.com/eugeneware/ffmpeg-static/releases/latest/download/ffprobe-linux-arm64
-          curl -fsSL -o $L/libqjs.so     https://github.com/quickjs-ng/quickjs/releases/latest/download/qjs-linux-aarch64
-          chmod +x $L/*.so
+          mkdir -p $L aar
+          curl -fsSL -o aar/ffmpeg.aar  "$YTDLA/ffmpeg/$YTDLA_VERSION/ffmpeg-$YTDLA_VERSION.aar"
+          curl -fsSL -o aar/library.aar "$YTDLA/library/$YTDLA_VERSION/library-$YTDLA_VERSION.aar"
+          unzip -o -j aar/ffmpeg.aar  "jni/arm64-v8a/libffmpeg.so" "jni/arm64-v8a/libffprobe.so" "jni/arm64-v8a/libffmpeg.zip.so" -d $L
+          unzip -o -j aar/library.aar "jni/arm64-v8a/libqjs.so" -d $L
           file $L/*.so
-          file $L/*.so | grep -q "dynamically linked" && { echo "tools must be static"; exit 1; } || true
+          for f in libffmpeg.so libffprobe.so libqjs.so; do file $L/$f | grep -q "linker64" || { echo "$f is not an Android executable"; exit 1; }; done
+          unzip -l $L/libffmpeg.zip.so | grep -q "usr/lib/libass.so" || { echo "ffmpeg libs missing libass"; exit 1; }
 
       - name: Build APK
         working-directory: android
@@ -223,7 +229,7 @@ jobs:
         run: |
           APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
           unzip -l "$APK" | grep -E "lib/arm64-v8a/lib(ffmpeg|ffprobe|qjs).so|bundle/scripts/moments.py|bundle/ui/index.html"
-          for f in libffmpeg.so libffprobe.so libqjs.so; do unzip -l "$APK" | grep -q "lib/arm64-v8a/$f" || { echo "missing $f"; exit 1; }; done
+          for f in libffmpeg.so libffprobe.so libffmpeg.zip.so libqjs.so; do unzip -l "$APK" | grep -q "lib/arm64-v8a/$f" || { echo "missing $f"; exit 1; }; done
           mkdir -p out && cp "$APK" out/ViceDesk.apk && ls -la out
 
       - uses: actions/upload-artifact@v4

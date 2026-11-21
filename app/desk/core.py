@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -192,6 +192,13 @@ def tool_status():
     except Exception:
         ok = False
     if IS_ANDROID:
+        from desk.android_main import TOOL_CHECK
+        for t in ("ffmpeg", "ffprobe"):
+            res = TOOL_CHECK.get(t)
+            if res and res != "ok":
+                out[t] = {"ok": False, "path": res}
+        qjs = TOOL_CHECK.get("qjs")
+        out["quickjs"] = {"ok": qjs == "ok", "path": "YouTube JS runtime" if qjs == "ok" else (qjs or "not checked")}
         out["faster-whisper"] = {"ok": False, "models": [], "path": "not on Android: clips are cut without captions"}
         return out
     m = installed_models() + [x for x in bundled_models() if x not in installed_models()]

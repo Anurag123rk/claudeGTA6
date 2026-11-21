@@ -215,7 +215,7 @@ async function loadStatus() {
     $("#ver").textContent = `v${s.version} · local`;
     $("#about").innerHTML = `Vice Desk ${esc(s.version)}. Runs the claudeGTA6 pipeline locally, with no login and no cloud backend. Tools folder: <span class="mono">${esc(s.bin)}</span>. You approve every post; nothing is uploaded.`;
     $("#wsLink").textContent = s.workspace; $("#wsLink").dataset.open = s.workspace;
-    const names = { ffmpeg: "ffmpeg (video engine)", ffprobe: "ffprobe", "yt-dlp": "yt-dlp (downloader)", "faster-whisper": "faster-whisper (captions)" };
+    const names = { ffmpeg: "ffmpeg (video engine)", ffprobe: "ffprobe", "yt-dlp": "yt-dlp (downloader)", "faster-whisper": "faster-whisper (captions)", quickjs: "QuickJS (YouTube JS runtime)" };
     $("#toolList").innerHTML = Object.entries(s.tools).map(([k, v]) => `<li><span>${names[k] || k}<br><span class="muted small mono">${esc(v.path || "missing")}</span></span><span class="st ${v.ok ? "ok" : "bad"}">${v.ok ? "✓ ready" : "✗ missing"}</span></li>`).join("");
     renderModelCards(s); fillModelSelect(s);
     const modelBusy = S.tasks.some((x) => x.kind === "install_model" && x.state === "running");
