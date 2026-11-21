@@ -13,7 +13,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from common import load_json, run_ffmpeg, save_json, stage, tool
 
-W, H = 1080, 1920
+W, H = 1080, 1920  # set per --platform in main()
+PLATFORMS = {  # output frame per destination
+    "vertical": (1080, 1920),   # TikTok, Instagram Reels, YouTube Shorts, Snapchat
+    "landscape": (1920, 1080),  # YouTube, X / Twitter
+    "feed": (1080, 1350),       # Instagram / Facebook feed (4:5)
+    "square": (1080, 1080),     # square posts
+}
+CAM_PRESETS = {  # webcam box (x:y:w:h fractions) when it cannot be detected automatically
+    "top-left": "0:0:0.26:0.30", "top-right": "0.74:0:0.26:0.30",
+    "bottom-left": "0:0.70:0.26:0.30", "bottom-right": "0.74:0.70:0.26:0.30",
+}
 
 
 def ts(t):
@@ -160,7 +170,7 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
         v = f"[0:v]scale=-2:{H},crop={W}:{H}[v]"
     elif layout == "blur":
         v = (f"[0:v]split[a][b];[a]scale=-2:{H},crop={W}:{H},boxblur=24:2,eq=brightness=-0.08[bg];"
-             f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-80[v]")
+             f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-{80 if H > W else 0}[v]")
     elif layout == 'react':
         sw, sh = src
         if face_expr:  # tracked face crop (no cam frame)
@@ -180,8 +190,9 @@ def video_filter(layout, cam, ass, band=None, cam_side='right', src=None, game_x
             v = v[:-3] + f"[v0];[v0]drawbox=x=0:y={y0}:w=iw:h={bh}:color=white@1:t=fill{en}[v]"
     else:
         x, y, w, h = map(float, cam.split(":"))
-        v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{int(H * 0.38)}:force_original_aspect_ratio=increase,"
-             f"crop={W}:{int(H * 0.38)}[cam];[b]scale=-2:{H - int(H * 0.38)},crop={W}:{H - int(H * 0.38)}[game];[cam][game]vstack[v]")
+        ch = even(H * 0.38); gh = H - ch  # even heights: odd ones get rounded and the frame ends up 2 px short
+        v = (f"[0:v]split[a][b];[a]crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},scale={W}:{ch}:force_original_aspect_ratio=increase,"
+             f"crop={W}:{ch}[cam];[b]scale=-2:{gh},crop={W}:{gh}[game];[cam][game]vstack[v]")
     sub = str(ass).replace("\\", "/").replace(":", "\\:")
     fonts = os.environ.get("VICE_FONTS_DIR")
     if fonts:
@@ -243,12 +254,21 @@ def main():
     ap.add_argument("--captions", choices=["word", "bubble", "none"], default="word")
     ap.add_argument("--hook", default="")
     ap.add_argument("--allow-profanity", action="store_true", help="keep swear words in captions (slurs are always masked)")
-    ap.add_argument("--cam", default="auto", help="auto (find the webcam) or x:y:w:h fractions")
+    ap.add_argument("--cam", default="auto", help="auto (find the webcam), top-left/top-right/bottom-left/bottom-right, or x:y:w:h fractions")
+    ap.add_argument("--platform", choices=list(PLATFORMS), default="vertical",
+                    help="vertical 9:16 (TikTok/Reels/Shorts), landscape 16:9 (YouTube/X), feed 4:5, square 1:1")
     ap.add_argument("--start", type=float); ap.add_argument("--end", type=float)
     ap.add_argument("--punch", type=float, default=0, help="zoom in this much on the peak moment, e.g. 0.15 (0 = off)")
     ap.add_argument("--clean-audio", action="store_true", help="reduce mic/background noise before loudness normalising")
     ap.add_argument("--fps", type=int, choices=[30, 60], default=30, help="60 = smooth motion interpolation (slow)")
     a = ap.parse_args()
+    global W, H, GAME_H
+    W, H = PLATFORMS[a.platform]
+    GAME_H = H - TOP
+    a.cam = CAM_PRESETS.get(a.cam, a.cam)
+    if a.platform != "vertical" and a.layout in ("facecam", "react"):
+        print(f"{a.layout} layout stacks the webcam above the game, which needs a 9:16 frame: using blur for {a.platform}")
+        a.layout = "blur"
     d = Path(a.job); c = load_json(d / "candidates.json")
     stage(1, 2, f"Preparing clip {a.pick}")
     pick = next((x for x in c["candidates"] if x["n"] == a.pick), None)
@@ -263,7 +283,13 @@ def main():
     layout, cam, side = a.layout, a.cam, 'right'
     face_expr = None
     if layout in ('react', 'facecam') and cam == 'auto':
-        from facecam import find_cam
+        try:
+            from facecam import find_cam
+        except ImportError:  # e.g. the Android app has no OpenCV: no automatic webcam detection
+            print("automatic webcam detection is not available here: using the blur layout. "
+                  "Pick the webcam position (top-left, top-right, ...) to use the facecam layout.")
+            layout = 'blur'
+    if layout in ('react', 'facecam') and cam == 'auto':
         r = find_cam(c['source'], s0, e0)
         if layout == 'react' and r.get('mode') not in ('cam', 'face'):
             sys.exit(f"skipped: no streamer face over gameplay in this moment ({r.get('mode')}: {r.get('reason', '')}). "
@@ -297,7 +323,7 @@ def main():
             layout = 'blur'
     elif layout in ('react', 'facecam') and cam != 'auto':
         side = 'left' if float(cam.split(':')[0]) + float(cam.split(':')[2]) / 2 < 0.5 else 'right'
-    cap_y = CAP_Y[layout]
+    cap_y = int(CAP_Y[layout] * H / 1920)
     title, band = None, None
     if a.title and layout == 'react':
         n = len(wrap(a.title, 26 if a.title_style == 'box' else 24))
@@ -336,7 +362,8 @@ def main():
         export_subs(caption_groups(cap_words, s0, e0, a.allow_profanity), s0, a.hook, out / f"clip_{a.pick}")
     info = c.get("info", {})
     save_json(out / f"clip_{a.pick}.json", {"file": str(mp4), "start": s0, "end": e0, "layout": layout,
-                                            "punch": a.punch, "clean_audio": a.clean_audio, "fps": a.fps, "hook": a.hook or a.title, "title": a.title, "cam": cam,
+                                            "punch": a.punch, "clean_audio": a.clean_audio, "fps": a.fps,
+                                            "platform": a.platform, "width": W, "height": H, "hook": a.hook or a.title, "title": a.title, "cam": cam,
                                             "source_url": info.get("webpage_url"), "source_title": info.get("title"),
                                             "source_channel": info.get("channel") or info.get("uploader")})
     print(mp4)

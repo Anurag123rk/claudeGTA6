@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -647,7 +647,8 @@ def _moment_args(p):
 
 
 def _cut_args(job, n, p):
-    a = [job, "--pick", n, "--layout", p.get("layout") or "blur", "--captions", p.get("captions") or "word"]
+    a = [job, "--pick", n, "--layout", p.get("layout") or "blur", "--captions", p.get("captions") or "word",
+         "--platform", p.get("platform") or "vertical", "--cam", p.get("cam") or "auto"]
     if p.get("hook"):
         a += ["--hook", p["hook"]]
     if p.get("title"):

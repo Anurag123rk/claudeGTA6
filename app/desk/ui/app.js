@@ -212,6 +212,7 @@ async function loadStatus() {
   try {
     const s = await api("/api/status", null, 8000); S.status = s;
     document.body.classList.toggle("android", !!s.android);
+    $$("form").forEach((f) => { if (f.elements.layout) syncCam(f); });
     $("#ver").textContent = `v${s.version} · local`;
     $("#about").innerHTML = `Vice Desk ${esc(s.version)}. Runs the claudeGTA6 pipeline locally, with no login and no cloud backend. Tools folder: <span class="mono">${esc(s.bin)}</span>. You approve every post; nothing is uploaded.`;
     $("#wsLink").textContent = s.workspace; $("#wsLink").dataset.open = s.workspace;
@@ -310,16 +311,52 @@ async function loadFind(kind) {
         const u = urlCol(row);
         const btns = u ? (kind === "streams"
           ? `<button class="sm primary" data-live="${esc(u)}">Record live</button>`
-          : `<button class="sm primary" data-pipe="${esc(u)}">Clip it</button> <button class="sm" data-fill="${esc(u)}">Options…</button>`) : "";
+          : `<button class="sm primary" data-clip="${esc(u)}" data-title="${esc(row.find((c) => /\]\(https?:/.test(c)) || "")}">Clip it</button>`) : "";
         return `<tr>${row.map((c) => `<td class="${/^[\d,.]+$/.test(c) ? "num" : ""}">${cellHtml(c)}</td>`).join("")}<td class="acts">${btns}</td></tr>`;
       }).join("")}</tbody></table></div>`;
     }).join("");
   } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
 }
 document.addEventListener("click", (e) => {
-  const p = e.target.closest("[data-pipe]"); if (p) { run("pipeline", { src: p.dataset.pipe, clips: 3, layout: "blur" }, "pipeTask"); go("pipeline"); }
-  const f = e.target.closest("[data-fill]"); if (f) { go("pipeline"); $("#pipeForm [name=src]").value = f.dataset.fill; $("#pipeForm [name=src]").focus(); }
+  const c = e.target.closest("[data-clip]"); if (c) openClipDialog(c.dataset.clip, c.dataset.title);
   const l = e.target.closest("[data-live]"); if (l) { go("live"); $("#liveForm [name=url]").value = l.dataset.live; }
+});
+
+// ---------------------------------------------------------------- layout / platform / webcam options
+function syncCam(form) {
+  const lay = form.elements.layout ? form.elements.layout.value : "blur";
+  const vertical = !form.elements.platform || form.elements.platform.value === "vertical";
+  const camLabel = form.querySelector(".cam-only");
+  if (camLabel) camLabel.hidden = !(["facecam", "react"].includes(lay) && vertical);
+  const cam = form.elements.cam;  // phones cannot auto-detect the webcam (no OpenCV): default to a corner
+  if (cam && (AND || (S.status && S.status.android)) && cam.value === "auto") cam.value = "top-right";
+}
+$$("form").forEach((f) => { if (f.elements.layout) { f.addEventListener("change", () => syncCam(f)); syncCam(f); } });
+
+const CLIP_KEYS = ["clips", "layout", "platform", "cam", "captions", "punch", "clean_audio", "fps60"];
+function openClipDialog(url, titleCell) {
+  const f = $("#clipForm"); f.reset();
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem("vd-clipopts") || "{}"); } catch (e) { /* storage blocked */ }
+  for (const k of CLIP_KEYS) {
+    const el = f.elements[k]; if (!el || saved[k] === undefined) continue;
+    if (el.type === "checkbox") el.checked = !!saved[k]; else el.value = saved[k];
+  }
+  f.elements.src.value = url;
+  const m = (titleCell || "").match(/^\[(.*)\]\(/); $("#clipTitle").textContent = m ? m[1] : url;
+  syncCam(f); $("#clipDialog").showModal();
+}
+$("#clipForm").addEventListener("submit", (e) => {
+  e.preventDefault(); const f = e.target; const d = formData(f);
+  const keep = {}; for (const k of CLIP_KEYS) { const el = f.elements[k]; if (el) keep[k] = el.type === "checkbox" ? el.checked : el.value; }
+  try { localStorage.setItem("vd-clipopts", JSON.stringify(keep)); } catch (er) { /* storage blocked */ }
+  $("#clipDialog").close(); go("pipeline"); run("pipeline", d, "pipeTask");
+});
+$("#clipClose").addEventListener("click", () => $("#clipDialog").close());
+$("#clipMore").addEventListener("click", () => {  // hand over to the full Pipeline form (moments, lengths, caption check)
+  const f = $("#clipForm"), p = $("#pipeForm");
+  for (const k of ["src", "layout", "platform", "cam", "captions", "hook", "clips"]) if (p.elements[k] && f.elements[k]) p.elements[k].value = f.elements[k].value;
+  for (const k of ["punch", "clean_audio", "fps60"]) if (p.elements[k] && f.elements[k]) p.elements[k].checked = f.elements[k].checked;
+  syncCam(p); $("#clipDialog").close(); go("pipeline"); p.elements.src.focus();
 });
 
 // ---------------------------------------------------------------- pipeline
@@ -346,7 +383,7 @@ document.addEventListener("click", (e) => {
   const lay = b.parentElement.querySelector("select");
   const f = formData($("#pipeForm"));
   run("cut", { job: b.dataset.job, pick: b.dataset.cut, layout: lay ? lay.value : "blur", hook: f.hook, captions: f.captions, caption: f.caption,
-    punch: f.punch, clean_audio: f.clean_audio, fps60: f.fps60 }, "pipeTask");
+    punch: f.punch, clean_audio: f.clean_audio, fps60: f.fps60, platform: f.platform, cam: f.cam }, "pipeTask");
 });
 
 // ---------------------------------------------------------------- live

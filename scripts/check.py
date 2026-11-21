@@ -62,7 +62,8 @@ def main():
     au = next((s for s in streams if s.get("codec_type") == "audio"), None)
     dur = float(p.get("format", {}).get("duration", 0) or 0)
 
-    add("resolution 1080x1920", bool(v) and (v.get("width"), v.get("height")) == (1080, 1920),
+    want = (meta.get("width", 1080), meta.get("height", 1920))  # cut.py records the platform frame
+    add(f"resolution {want[0]}x{want[1]}", bool(v) and (v.get("width"), v.get("height")) == want,
         f"{v.get('width')}x{v.get('height')}" if v else "no video")
     f = fps_of(v.get("r_frame_rate", "0/1")) if v else 0
     add("fps 30 or 60", 29 <= f <= 31 or 59 <= f <= 61, f"{f:.2f}")

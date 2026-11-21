@@ -46,6 +46,8 @@
             <div class="row">
               <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
               <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+              <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
               <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             </div>
             <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
@@ -107,6 +109,8 @@
           </div>
           <div class="row">
             <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+              <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
             <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
             <label class="grow">Hook<input name="hook" maxlength="80" placeholder="optional on-screen opener"></label>
           </div>
@@ -203,6 +207,27 @@
     <div class="row end"><a href="#" id="skipModel" class="small">Skip for now (clips without captions)</a></div>
   </div>
 </div>
+<dialog id="clipDialog">
+  <form id="clipForm" method="dialog" class="stack">
+    <div class="card-h"><h2>Clip this video</h2><button type="button" id="clipClose">✕</button></div>
+    <p class="muted small" id="clipTitle"></p>
+    <input type="hidden" name="src">
+    <div class="row">
+      <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
+      <label>Layout<select name="layout"><option value="blur">Blur background</option><option value="fill">Fill</option><option value="facecam">Facecam</option><option value="react">Reaction</option></select></label>
+      <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+      <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
+    </div>
+    <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
+    <div class="row studio">
+      <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom</span></label>
+      <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean audio</span></label>
+      <label class="chk desk-only"><span><input type="checkbox" name="fps60"> Smooth 60 fps (slow)</span></label>
+    </div>
+    <div class="row end"><button type="button" id="clipMore">More options…</button><button class="primary" type="submit">Start clipping</button></div>
+  </form>
+</dialog>
 <div id="toast" class="toast" hidden></div>
 <dialog id="player"><div class="card-h"><b id="playerTitle"></b><button id="closePlayer">Close</button></div><video id="video" controls playsinline></video></dialog>
 <script src="app.js"></script>

@@ -1,11 +1,23 @@
-## Vice Desk 2.0.2: Windows, macOS, Linux and Android
+## Vice Desk 2.0.3: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.2-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.0.2-linux-x86_64` | `chmod +x ViceDesk-2.0.2-linux-x86_64 && ./ViceDesk-2.0.2-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.2.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.3-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.0.3-linux-x86_64` | `chmod +x ViceDesk-2.0.3-linux-x86_64 && ./ViceDesk-2.0.3-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.3.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### New in 2.0.3
+- **Choose before you clip.** "Clip it" in Find videos opens an options sheet: number of clips, layout, platform, webcam position, captions, hook, punch-in and clean audio. It remembers your last choices, and "More options…" opens the full Pipeline form.
+- **Crop for each platform.** Every clip form (Quick start, Pipeline, the options sheet and the per-moment Cut buttons) has a Platform choice:
+  - TikTok, Reels and Shorts: 9:16, 1080×1920
+  - YouTube and X: 16:9, 1920×1080
+  - Instagram feed: 4:5, 1080×1350
+  - Square: 1:1, 1080×1080
+
+  The rule check expects the matching size.
+- **Facecam and Reaction on Android.** These crashed with `No module named 'cv2'`, because the phone app can't detect the webcam automatically. Pick the webcam position (top left, top right, bottom left or bottom right) instead. On a phone it defaults to top right. If automatic detection isn't available, the clip falls back to blur instead of failing.
+- Fixed: facecam clips came out 1080×1918 (2 px short) and failed the rule check.
 
 ### Fixed in 2.0.2 (Android)
 - **ffmpeg "CANNOT LINK EXECUTABLE … too small to be an ELF executable".** ffmpeg's libraries were unpacked with their version links (`libavdevice.so.61 → libavdevice.so.61.3.100`) saved as tiny text files, and a few runtime libraries it needs (libc++_shared, libcrypto, libexpat) were missing. Both are fixed, and the build now refuses to publish an APK where ffmpeg can't find any of its 81 libraries.

@@ -157,3 +157,5 @@ label.chk { flex: 0 0 auto; justify-content: flex-end; } label.chk span { displa
 .toast { pointer-events: none; }
 body.android [data-open] { display: none !important; }
 .row.studio { gap: 4px 18px; } .row.studio label.chk { flex: 0 0 auto; } .row.studio label.chk span { padding-bottom: 0; }
+#clipDialog { width: min(560px, 94vw); max-height: 90vh; overflow: auto; }
+#clipDialog .row > label { flex: 1 1 150px; }
