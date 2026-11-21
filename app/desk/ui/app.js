@@ -93,6 +93,13 @@ function onTasks(tasks) {
     if (prev && prev !== t.state && ["done", "failed", "cancelled"].includes(t.state)) onFinished(t);
     S.prevStates[t.id] = t.state;
   }
+  if (AND && AND.setBusy) {  // Android: keep the app alive in the background while work runs
+    const t = running[0];
+    const msg = !t ? "" : [t.step || t.title, t.progress != null ? Math.round(t.progress * 100) + "%" : "",
+      t.download && t.download.speed ? fmtSpeed(t.download.speed) : ""].filter(Boolean).join(" · ") + (running.length > 1 ? ` (+${running.length - 1} more)` : "");
+    const now = Date.now();
+    if (msg !== S.busyMsg && (!msg || !S.busyMsg || now - (S.busyAt || 0) > 1500)) { S.busyMsg = msg; S.busyAt = now; try { AND.setBusy(msg); } catch (e) { /* old app */ } }
+  }
   renderDash(); renderWatched(); if ($("#page-monitor").classList.contains("on")) renderMonitor();
   document.title = running.length ? `(${Math.round((running[0].progress || 0) * 100)}%) Vice Desk` : "Vice Desk";
 }

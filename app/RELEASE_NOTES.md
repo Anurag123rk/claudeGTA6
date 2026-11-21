@@ -1,11 +1,16 @@
-## Vice Desk 2.0.3: Windows, macOS, Linux and Android
+## Vice Desk 2.0.4: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.3-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.0.3-linux-x86_64` | `chmod +x ViceDesk-2.0.3-linux-x86_64 && ./ViceDesk-2.0.3-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.3.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.0.4-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.0.4-linux-x86_64` | `chmod +x ViceDesk-2.0.4-linux-x86_64 && ./ViceDesk-2.0.4-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.0.4.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.0.4
+- **Downloads keep going when you switch apps (Android).** While a task runs, Vice Desk shows a progress notification and keeps the CPU and Wi-Fi awake, so Android no longer freezes the download. The keep-alive is released when the last task finishes. Allow notifications when asked to see the progress; the work continues either way.
+- **A cut-off download is never reused.** Videos download to a temporary file and only become `source.mp4` once they are complete and readable. A damaged leftover from an earlier run is detected and downloaded again, which fixes "Invalid data found when processing input". Network drops are retried up to 3 times and resume where they stopped, and audio extraction is crash-safe too.
+- Reading video info is retried when the network is briefly unavailable ("Failed to resolve www.youtube.com").
 
 ### New in 2.0.3
 - **Choose before you clip.** "Clip it" in Find videos opens an options sheet: number of clips, layout, platform, webcam position, captions, hook, punch-in and clean audio. It remembers your last choices, and "More options…" opens the full Pipeline form.

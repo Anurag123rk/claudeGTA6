@@ -195,6 +195,40 @@ def run_ffmpeg(cmd, duration, label="encoded"):
     progress(duration, duration, label)
 
 
+def media_ok(path, need_video=True):
+    """True if path is a complete, readable media file (a download cut off half-way is not)."""
+    path = Path(path)
+    if not path.exists() or path.stat().st_size < 1024:
+        return False
+    r = run([tool("ffprobe"), "-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json", str(path)],
+            check=False, capture=True)
+    if r.returncode != 0:
+        return False
+    try:
+        j = json.loads(r.stdout)
+        dur = float(j.get("format", {}).get("duration") or 0)
+        kinds = {s_.get("codec_type") for s_ in j.get("streams", [])}
+    except (ValueError, TypeError):
+        return False
+    return dur > 1 and ("video" in kinds or not need_video)
+
+
+def retry(fn, what, attempts=3, wait=5):
+    """Call fn(); on failure (network drop, app suspended...) wait and try again. Stop is never retried."""
+    import time as _time
+    for k in range(1, attempts + 1):
+        try:
+            return fn()
+        except (SystemExit, Exception) as e:  # yt-dlp failures surface as SystemExit (ytdl_download) or exceptions
+            msg = str(e.code if isinstance(e, SystemExit) else e)
+            if msg == "cancelled" or k == attempts:
+                raise
+            print(f"{what} failed ({msg[:160]}); retrying in {wait * k}s ({k}/{attempts - 1})", flush=True)
+            for _ in range(wait * k):
+                check_cancel()
+                _time.sleep(1)
+
+
 def ffprobe(path):
     r = run([tool("ffprobe"), "-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height,r_frame_rate",
              "-of", "json", str(path)], capture=True)

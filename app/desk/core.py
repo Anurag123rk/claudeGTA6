@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -357,6 +357,9 @@ class TaskManager:
                 if t.download:
                     t.download["speed"] = 0
                 t.touch()
+                if IS_ANDROID and not any(x.state in ("queued", "running") for x in self.list()):
+                    from desk.android_main import set_busy
+                    set_busy("")  # last task done: release the background keep-alive
         threading.Thread(target=go, daemon=True).start()
         return t
 

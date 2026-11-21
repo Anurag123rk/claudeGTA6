@@ -10,7 +10,7 @@ import argparse, json, math, os, re, sys, wave
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
-from common import ffprobe, is_url, job_dir, load_json, progress, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
+from common import ffprobe, is_url, job_dir, load_json, media_ok, progress, retry, run, save_json, stage, tool, ytdl_chat_replay, ytdl_download, ytdl_info
 
 HYPE = re.compile(r"\b(no way|oh my god|omg|what|wait|bro|let'?s go|holy|insane|crazy|yo+|wtf|dude|look at|nah|run|go go)\b", re.I)
 CHAT_HYPE = re.compile(r"(LMAO|LOL|KEKW|OMEGALUL|W+\b|CLIP|💀|😂|🔥|NO WAY|HOLY)", re.I)
@@ -21,7 +21,7 @@ def fetch(src, d, max_min):
     if is_url(src):
         stage(1, 5, "Reading video info")
         try:
-            info = ytdl_info(src)
+            info = retry(lambda: ytdl_info(src), "reading video info")
         except Exception as e:
             sys.exit(f"could not read this video: {str(e).replace('ERROR: ', '')[:300]}")
         save_json(d / "info.json", {k: info.get(k) for k in ("id", "title", "uploader", "channel", "uploader_id", "webpage_url",
@@ -30,11 +30,22 @@ def fetch(src, d, max_min):
             sys.exit("this video is live right now: use Live mode to record it, or wait until it has ended")
         vid = d / "source.mp4"
         stage(2, 5, "Downloading video")
+        if vid.exists() and not media_ok(vid):  # e.g. an earlier run was cut off when the phone paused the app
+            print("the previous download is incomplete or damaged: downloading it again", flush=True)
+            vid.unlink()
+            for f in (d / "audio.wav", d / "transcript.json"):
+                f.unlink(missing_ok=True)
         if not vid.exists():
             h = int(os.environ.get("VICE_MAX_HEIGHT") or 1080)  # the Android app asks for 720p
             fmt = f"bv*[height<={h}][ext=mp4]+ba[ext=m4a]/bv*[height<={h}]+ba/b[height<={h}]/b"
             long = (info.get("duration") or 0) > max_min * 60
-            ytdl_download(src, vid, fmt, max_seconds=max_min * 60 if long else None)
+            tmp = d / "download.mp4"  # renamed to source.mp4 only once it is complete and readable
+            tmp.unlink(missing_ok=True)  # a finished-but-broken file; yt-dlp's .part files are kept and resumed
+            retry(lambda: ytdl_download(src, tmp, fmt, max_seconds=max_min * 60 if long else None), "download")
+            if not media_ok(tmp):
+                tmp.unlink(missing_ok=True)
+                sys.exit("the download finished but the file is damaged (connection dropped?). Please run it again.")
+            tmp.replace(vid)
         if info.get("was_live") and not list(d.glob("chat*.live_chat.json")):  # YouTube chat replay
             ytdl_chat_replay(src, d / "chat")
     else:
@@ -49,8 +60,12 @@ def fetch(src, d, max_min):
 def audio_rms(vid, d):
     wav = d / "audio.wav"
     stage(3, 5, "Extracting audio")
+    if wav.exists() and wav.stat().st_size < 44 + 16000 * 2:  # header only: an interrupted earlier run
+        wav.unlink()
     if not wav.exists():
-        run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(vid), "-ac", "1", "-ar", "16000", str(wav)])
+        part = d / "audio.part.wav"
+        run([tool("ffmpeg"), "-y", "-v", "error", "-i", str(vid), "-ac", "1", "-ar", "16000", str(part)])
+        part.replace(wav)
     with wave.open(str(wav)) as w:
         x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
     n = len(x) // 16000

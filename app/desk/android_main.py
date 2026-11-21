@@ -146,6 +146,17 @@ def start(files_dir, native_dir, workspace_dir, bundle_dir):
     return server.serve(0)
 
 
+def set_busy(text):
+    """Tell the Android foreground service what is running ("" = idle, it stops). Safe to call from any thread."""
+    try:
+        from java import jclass
+        from com.chaquo.python import Python
+        app = Python.getPlatform().getApplication()
+        jclass("com.claudegta6.vicedesk.EngineService").update(app, text or "")
+    except Exception as e:  # not on Android, or an older app build
+        print("set_busy:", e, flush=True)
+
+
 def stop():
     from desk import server
     server.shutdown()

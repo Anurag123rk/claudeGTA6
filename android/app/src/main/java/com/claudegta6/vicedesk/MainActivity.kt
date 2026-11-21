@@ -135,6 +135,16 @@ class MainActivity : Activity() {
         }
     }
 
+    private var askedNotifications = false
+
+    /** Android 13+: the progress notification needs permission (the work continues either way). */
+    private fun askNotifications() = runOnUiThread {
+        if (askedNotifications || android.os.Build.VERSION.SDK_INT < 33) return@runOnUiThread
+        askedNotifications = true
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 42)
+    }
+
     private fun openExternal(url: String) {
         try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { message("No app can open this link") }
     }
@@ -204,6 +214,12 @@ class MainActivity : Activity() {
                     runOnUiThread { startActivity(Intent.createChooser(send, "Post clip with…")) }
                 } catch (e: Exception) { message("Share failed: ${e.message}") }
             }.start()
+        }
+
+        /** Called by the UI with a one-line summary of running work ("" when idle). */
+        @JavascriptInterface fun setBusy(text: String) {
+            if (text.isNotBlank()) askNotifications()
+            EngineService.update(applicationContext, text)
         }
 
         @JavascriptInterface fun pickVideo() = runOnUiThread {
