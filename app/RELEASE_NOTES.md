@@ -1,4 +1,4 @@
-## Vice Desk 2.0.0: Windows app + Android app
+## Vice Desk 2.0.0: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
@@ -20,8 +20,8 @@
 - Downloads run inside the app instead of as separate processes: faster start, same live speed/ETA readout.
 
 ### Android notes
-- Captions: the speech engine (faster-whisper) has no Android build, so phone clips are cut **without captions**. Moments are still scored on loudness, YouTube "most replayed" and chat activity. Use the Windows app for captioned clips.
-- Live recording is Windows-only for now.
+- Captions: the speech engine (faster-whisper) has no Android build, so phone clips are cut **without captions**. Moments are still scored on loudness, YouTube "most replayed" and chat activity. Use a desktop app for captioned clips.
+- Live recording is desktop-only for now.
 - Keep the app open while a long video downloads or encodes. The screen stays on, but Android may pause apps in the background.
 - Built for 64-bit ARM phones (almost every phone since 2019).
 
