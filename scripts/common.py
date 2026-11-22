@@ -1,5 +1,5 @@
 """Shared helpers: paths, tool lookup, yt-dlp and ffmpeg wrappers."""
-import hashlib, json, os, re, shutil, subprocess, sys
+import hashlib, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
 for _st in (sys.stdout, sys.stderr):  # emoji in titles must not crash a cp1252 Windows console
@@ -169,18 +169,24 @@ def ytdl_download(url, out, fmt, max_seconds=None):
         if clients:
             o["extractor_args"] = {"youtube": {"player_client": clients}}
             print(f"YouTube refused that route; trying the {'/'.join(clients)} player", flush=True)
-        try:
-            with yt_dlp.YoutubeDL(o) as ydl:
-                rc = ydl.download([url])
-            if not rc:
-                return
-            last = "download failed (see log)"
-        except yt_dlp.utils.DownloadError as e:
-            last = str(e).replace("ERROR: ", "")
-            is_youtube = "youtube.com" in url or "youtu.be" in url
-            if not (_refused(last) and is_youtube):
-                break  # other errors (or other sites) are not fixed by switching YouTube player clients
-        _drop_partials(out)
+        for attempt in range(3):  # a dropped connection mid-download (ffmpeg exits non-zero) usually works the next time
+            try:
+                with yt_dlp.YoutubeDL(o) as ydl:
+                    rc = ydl.download([url])
+                if not rc:
+                    return
+                last = "download failed (see log)"
+            except yt_dlp.utils.DownloadError as e:
+                last = str(e).replace("ERROR: ", "")
+            _drop_partials(out)
+            if not _transient(last) or attempt == 2:
+                break
+            check_cancel()
+            print(f"the connection dropped mid-download; trying again ({attempt + 2} of 3)", flush=True)
+            time.sleep(3 + 4 * attempt)
+        is_youtube = "youtube.com" in url or "youtu.be" in url
+        if not (_refused(last) and is_youtube):
+            break  # other errors (or other sites) are not fixed by switching YouTube player clients
     if "403" in last or "Forbidden" in last:
         sys.exit("download failed: YouTube refused the download (HTTP 403) on every player route [needs-cookies]. "
                  "Sign in under Settings > YouTube sign-in, or try again later / on Wi-Fi, then press Retry.")
@@ -188,6 +194,12 @@ def ytdl_download(url, out, fmt, max_seconds=None):
 
 
 YT_CLIENT_FALLBACKS = [None, ["tv", "web_safari"], ["android_vr"], ["mweb"]]
+
+
+def _transient(msg):
+    m = (msg or "").lower()
+    return any(k in m for k in ("ffmpeg exited with code", "connection reset", "timed out", "read timed out",
+                                "incompleteread", "connection aborted", "temporary failure", "unable to download video data"))
 
 
 def _refused(msg):

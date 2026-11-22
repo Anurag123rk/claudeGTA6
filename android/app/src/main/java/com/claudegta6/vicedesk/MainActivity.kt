@@ -204,6 +204,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun openUrl(url: String) = runOnUiThread { openExternal(url) }
 
         @JavascriptInterface fun saveToGallery(path: String) {
+            message("Saving to your gallery…")
             Thread {
                 try { copyToGallery(path); message("Saved to your gallery (Movies/ViceDesk)") }
                 catch (e: Exception) { message("Save failed: ${e.message}") }

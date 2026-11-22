@@ -129,7 +129,8 @@ function taskCard(t, opts = {}) {
     (r.checks || []).forEach((c, i) => b.push(`<span class="badge ${c.pass ? "done" : "failed"}" title="${esc((c.lines || []).join("\n"))}">Clip ${i + 1} ${c.pass ? "PASS" : "FAIL"}</span>`));
     if (r.file) b.push(`<button class="sm" data-showfind="${t.kind}">Show results</button>`);
     if (r.draft) b.push(`<button class="sm primary" data-play="${esc(r.draft)}" data-name="Draft">▶ Watch the draft</button>`, AND
-      ? `<button class="sm" data-share="${esc(r.draft)}">Share</button>` : `<button class="sm" data-open="${esc(r.publish || r.project)}">Open publish pack</button>`);
+      ? `<button class="sm" data-share="${esc(r.draft)}">Share</button><button class="sm" data-save="${esc(r.draft)}">Save to gallery</button>`
+      : `<button class="sm" data-open="${esc(r.publish || r.project)}">Open publish pack</button>`);
     res = b.length ? `<div class="res">${b.join("")}</div>` : "";
   }
   return `<div class="task ${S.selTask === t.id ? "sel" : ""}" data-task="${t.id}">
@@ -441,18 +442,31 @@ function clipCard(c) {
       ? `<button class="sm primary" data-share="${esc(c.file)}">Share</button><button class="sm" data-save="${esc(c.file)}">Save</button>`
       : `<button class="sm" data-open="${esc(c.file)}">Open</button>`}</div></div></div>`;
 }
+function lfCard(c) {
+  const v = Math.round(c.mtime || 0);
+  const fresh = Date.now() / 1000 - (c.mtime || 0) < 30 * 60;
+  return `<div class="clip"><video preload="none" muted ${c.thumb ? `poster="${fileUrl(c.thumb)}&v=${v}"` : ""} src="${fileUrl(c.file)}&v=${v}#t=1" data-play="${esc(c.file)}" data-name="${esc(c.title)}"></video>
+    <div class="ci"><b>${esc(c.title)}${fresh ? ' <span class="badge done">new</span>' : ""}</b><span class="muted">${esc(c.channel)} · ${fmtBytes(c.size)}</span>
+    <span class="muted small">${new Date((c.mtime || 0) * 1000).toLocaleString()}</span>
+    <div class="acts" style="margin-top:6px;flex-wrap:wrap">${AND
+      ? `<button class="sm primary" data-share="${esc(c.file)}">Share</button><button class="sm" data-save="${esc(c.file)}">Save to gallery</button>`
+      : `<button class="sm" data-open="${esc(c.file)}">Open</button><button class="sm" data-open="${esc(c.publish)}">Publish pack</button>`}</div></div></div>`;
+}
 async function loadJobs(quiet) {
   try {
     const r = await api("/api/jobs"); S.jobs = r.jobs;
     const box = $("#jobs");
-    box.innerHTML = r.jobs.length ? r.jobs.map((j, i) => `<details class="job" ${i === 0 ? "open" : ""}><summary><span class="jt">${esc(j.title)}</span>
+    const lf = r.longform || [];
+    const lfHtml = lf.length ? `<details class="job" open><summary><span class="jt">Long-form videos</span><span class="muted small">${lf.length} draft${lf.length > 1 ? "s" : ""}</span></summary>
+      <div class="body"><div class="clipgrid">${lf.map(lfCard).join("")}</div></div></details>` : "";
+    box.innerHTML = lfHtml + (r.jobs.length ? r.jobs.map((j, i) => `<details class="job" ${i === 0 ? "open" : ""}><summary><span class="jt">${esc(j.title)}</span>
         <span class="muted small">${j.candidates.length} moments · ${j.clips.length} clips${j.live.length ? " · " + j.live.length + " live spikes" : ""}</span>
         <span class="muted small">${new Date(j.mtime * 1000).toLocaleString()}</span></summary><div class="body">
         <div class="acts" style="margin-bottom:8px">${j.url ? `<a data-ext="${esc(j.url)}" href="#" class="small">${esc(j.url)}</a>` : ""} <button class="sm" data-open="${esc(j.dir)}">Open folder</button></div>
         ${j.candidates.map((c) => candRow(j.dir, c)).join("")}
         ${j.clips.length ? `<h2 style="margin-top:14px">Clips</h2><div class="clipgrid">${j.clips.map(clipCard).join("")}</div>` : ""}
         ${j.live.length ? `<h2 style="margin-top:14px">Live spikes</h2><div class="clipgrid">${j.live.map(clipCard).join("")}</div>` : ""}
-        </div></details>`).join("") : `<p class="muted">No jobs yet. Run the pipeline on a video to fill your library.</p>`;
+        </div></details>`).join("") : (lf.length ? "" : `<p class="muted">No jobs yet. Run the pipeline on a video to fill your library.</p>`));
     const clips = r.jobs.flatMap((j) => j.clips).slice(0, 6);
     $("#dashClips").innerHTML = clips.length ? clips.map(clipCard).join("") : `<p class="muted">No clips yet.</p>`;
     return r.jobs;

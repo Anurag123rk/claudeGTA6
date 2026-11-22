@@ -1,11 +1,17 @@
-## Vice Desk 2.2.7: Windows, macOS, Linux and Android
+## Vice Desk 2.2.8: Windows, macOS, Linux and Android
 
 | Platform | Download | Install |
 |---|---|---|
 | **Windows 10/11** | `ViceDesk.exe` | Double-click. If SmartScreen warns: **More info → Run anyway** (unsigned). |
-| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.7-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
-| **Linux (x86-64)** | `ViceDesk-2.2.7-linux-x86_64` | `chmod +x ViceDesk-2.2.7-linux-x86_64 && ./ViceDesk-2.2.7-linux-x86_64`; it opens in your browser. |
-| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.7.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+| **macOS 12+ (Apple silicon)** | `ViceDesk-2.2.8-mac-arm64.dmg` | Open the .dmg and drag **Vice Desk** to Applications. First launch: right-click → **Open** (unsigned). If macOS says it is damaged, run `xattr -cr "/Applications/Vice Desk.app"` once. |
+| **Linux (x86-64)** | `ViceDesk-2.2.8-linux-x86_64` | `chmod +x ViceDesk-2.2.8-linux-x86_64 && ./ViceDesk-2.2.8-linux-x86_64`; it opens in your browser. |
+| **Android 10+ (64-bit ARM phones)** | `ViceDesk-2.2.8.apk` | Open the file on your phone and allow **Install unknown apps** for your browser or file manager when asked. |
+
+### Fixed in 2.2.8
+- **"download failed: ffmpeg exited with code 8"** in long-form footage (Retry used to get past it). A dropped connection mid-download is now retried automatically, up to 3 times.
+- **A new long-form video reused the previous one** (the old concept and draft came back, "AI usage: 0 calls"). A new request now always starts its own run; only **Retry** of the same request continues where it stopped. A topic you type now drives the research and the concept.
+- **New: long-form videos in Clips & jobs.** Every finished draft is listed under *Long-form videos* with its thumbnail and title.
+- **New: Save to gallery** for long-form drafts (in Clips & jobs and on the finished task in Monitor), saved to Movies/ViceDesk.
 
 ### Fixed in 2.2.7
 - **Long-form footage got stuck on "official video 2 of 2"** with the bar refilling over and over. The search picked up Rockstar's *channel* link as a video and started downloading the whole channel. Only real video links are used now, channel/playlist links you paste are skipped with a note, and a download never pulls more than one video.

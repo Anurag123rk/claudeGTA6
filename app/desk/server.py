@@ -158,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
             from desk import ai
             return self._json(ai.public())
         if path == "/api/jobs":
-            return self._json({"jobs": core.list_jobs()})
+            return self._json({"jobs": core.list_jobs(), "longform": core.list_longform()})
         if path == "/api/file":
             return self._file((q.get("path") or [""])[0])
         if path == "/api/text":

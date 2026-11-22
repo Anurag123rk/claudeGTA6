@@ -13,7 +13,7 @@ import collections, json, os, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 
 APP_NAME = "Vice Desk"
-VERSION = "2.2.7"
+VERSION = "2.2.8"
 IS_WIN = sys.platform == "win32"
 FROZEN = getattr(sys, "frozen", False)
 IS_ANDROID = bool(os.environ.get("VICE_ANDROID"))  # set by the Android app before the engine starts
@@ -990,6 +990,28 @@ RUNNERS = {"trends": runner_trends, "streams": runner_streams, "moments": runner
 
 
 # ---------------------------------------------------------------- library
+
+def list_longform():
+    """Finished long-form drafts, newest first (each run keeps its own draft, title and thumbnail)."""
+    out = []
+    root = ws() / "longform"
+    for draft in root.glob("*/runs/run_*/build/draft.mp4") if root.exists() else []:
+        if draft.stat().st_size < 100_000:  # empty or still being written
+            continue
+        rd = draft.parent.parent
+        title = ""
+        try:
+            title = (rd / "publish" / "title.txt").read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+        st = draft.stat()
+        thumb = rd / "publish" / "thumbnail.jpg"
+        out.append({"file": str(draft), "name": title or rd.name, "title": title or rd.name, "size": st.st_size,
+                    "mtime": st.st_mtime, "channel": rd.parent.parent.name, "run": str(rd),
+                    "publish": str(rd / "publish"), "thumb": str(thumb) if thumb.exists() else ""})
+    out.sort(key=lambda x: -x["mtime"])
+    return out
+
 
 def list_jobs():
     root = ws() / "jobs"

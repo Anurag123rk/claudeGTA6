@@ -103,7 +103,7 @@ def pick_topic(d, outliers, topics, idea, topic):
     if out.exists():
         return rj(out)
     ctx = json.dumps([{k: o[k] for k in ("title", "outlier", "minutes")} for o in outliers[:10]], ensure_ascii=False)
-    ask = (f"Our topics: {topics}. " + (f"The user wants this topic: {topic}. " if topic else "") +
+    ask = (f"Our topics: {topics}. " + (f"The user chose this topic, and every concept must be about it (not a different subject): {topic}. " if topic else "") +
            ("Study these niche outliers (title, outlier score = views / channel's usual views, length) and pitch three "
             f"concepts that ride what is already winning:\n{ctx}\n" if idea == "outliers" and outliers else
             "Pitch three original concepts players would care about this month.\n") +
@@ -432,15 +432,30 @@ def main():
     d = Path(a.project)
     runs = d / "runs"
     last = sorted(runs.glob("run_*")) if runs.exists() else []
-    rd = (last[-1] if last and not a.fresh else runs / time.strftime("run_%Y%m%d_%H%M%S"))
+    # Continue the last run only if it is the same request (a Retry) and it never finished;
+    # a new topic, idea or length always starts a new run.
+    want = {"topic": a.topic.strip(), "topics": a.topics.strip(), "idea": a.idea, "minutes": float(a.minutes),
+            "footage": a.footage.strip()}
+    rd = None
+    if last and not a.fresh and not (last[-1] / "publish" / "thumbnail.jpg").exists():
+        try:
+            if json.loads((last[-1] / "request.json").read_text(encoding="utf-8")) == want:
+                rd = last[-1]
+        except Exception:
+            pass
+    if rd is None:
+        rd = runs / time.strftime("run_%Y%m%d_%H%M%S")
+    else:
+        say("continuing the unfinished run for this same request")
     rd.mkdir(parents=True, exist_ok=True)
+    (rd / "request.json").write_text(json.dumps(want), encoding="utf-8")
     say(f"run folder: {rd}")
     m = ai().public()
     say(f"model: {m['providers'][m['provider']]['label']} · {m['model']}")
     facts_file = d / "facts.md"
     facts = facts_file.read_text(encoding="utf-8") if facts_file.exists() else ""
     stage(1, N, "Studying the niche (outliers)")
-    outliers = study(rd, a.topics) if a.idea == "outliers" else []
+    outliers = study(rd, a.topic.strip() or a.topics) if a.idea == "outliers" else []
     stage(2, N, "Choosing the topic")
     concept = pick_topic(rd, outliers, a.topics, a.idea, a.topic)
     say(f"concept: {concept.get('title')} | {concept.get('pick_reason', '')[:140]}")
