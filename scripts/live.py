@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from common import job_dir, run, save_json, tool, ytdlp_base
+from common import job_dir, run, save_json, stop_requested, tool, ytdlp_base
 
 HYPE = re.compile(r"(?i:LMAO|KEKW|LOL|CLIP|HOLY|NO WAY)|\bW+\b|[💀😂🔥]")
 NOISE = re.compile(r"(?i)giveaway|\braid(ing|ed)?\b|\bbrb\b|be right back|ad break|sponsor|subscribe|discord\.gg|https?://|promo code|follow me")
@@ -244,7 +244,6 @@ def main():
     print(f"recording {a.minutes:g} min -> {ld}  (Ctrl+C to stop)", flush=True)
 
     def finish_one(item, final=False):
-        nonlocal spikes
         num, wall, rate, words = item
         out = ld / f"spike_{num}.mp4"
         center, ok = cut(rec, wall, a.before, a.after, a.lag, out)
@@ -258,6 +257,10 @@ def main():
     try:
         while now() < end_at and rec.alive():
             time.sleep(1)
+            if stop_requested():
+                print("stop requested, finishing pending clips...", flush=True)
+                break
+            print(f"[PROG] {min(now() - start, a.minutes * 60):.0f}|{a.minutes * 60:.0f}|recorded, {spikes} spike(s)", flush=True)
             tail.poll()
             t = now()
             if rec.t0 is None and any(ld.glob("seg_*.ts")):

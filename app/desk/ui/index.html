@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Vice Desk</title>
+<link rel="stylesheet" href="app.css">
+<script>window.DESK_TOKEN = "__DESK_TOKEN__";</script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="logo">V</span><div><b>Vice Desk</b><small id="ver">GTA 6 clip pipeline</small></div></div>
+    <nav id="nav">
+      <a data-page="dashboard" class="on"><i>◉</i>Dashboard</a>
+      <a data-page="find"><i>⌕</i>Find videos</a>
+      <a data-page="pipeline"><i>▶</i>Pipeline</a>
+      <a data-page="live" class="desk-only"><i>●</i>Live mode</a>
+      <a data-page="longform"><i>▦</i>Long-form</a>
+      <a data-page="library"><i>▤</i>Clips &amp; jobs</a>
+      <a data-page="monitor"><i>≋</i>Monitor <span class="pill" id="runCount" hidden>0</span></a>
+      <a data-page="settings"><i>⚙</i>Settings</a>
+    </nav>
+    <div class="side-foot">
+      <div class="net"><span>Network</span><b id="netSpeed">idle</b></div>
+      <svg id="netSpark" class="spark" viewBox="0 0 160 30" preserveAspectRatio="none"></svg>
+      <div class="conn" id="conn"><span class="dot"></span> <span>connecting…</span></div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <!-- DASHBOARD -->
+    <section class="page on" id="page-dashboard">
+      <header class="hero">
+        <div>
+          <h1>Clip control room</h1>
+          <p>Paste a GTA 6 video or VOD. Vice Desk downloads it, finds the best moments, cuts vertical clips with captions and checks them. Everything runs on this device, with no account needed.</p>
+        </div>
+      </header>
+      <div id="setupBanner" class="banner" hidden></div>
+      <div class="grid2">
+        <div class="card">
+          <h2>Quick start</h2>
+          <form id="quickForm" class="stack">
+            <label>Video URL or file path<input name="src" placeholder="https://www.youtube.com/watch?v=…  or  C:\Videos\stream.mp4" required></label>
+            <div class="row">
+              <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
+              <label>Layout<select name="layout"><option value="crop">Crop · follows the action</option><option value="blur">Blur background</option><option value="fill">Fill (centre crop)</option><option value="facecam">Facecam + gameplay</option><option value="react">Reaction</option></select></label>
+              <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="none">No webcam</option><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+              <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
+            </div>
+            <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
+            <div class="brand-opts">
+              <div class="row">
+                <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label>Card style<select name="card_theme"><option value="vice">GTA VI (Vice)</option><option value="clean">Clean</option></select></label>
+                <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
+              </div>
+              <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
+              <div class="row studio">
+                <label class="chk"><span><input type="checkbox" name="context" checked> Context intro (what the video is about)</span></label>
+                <label class="chk"><span><input type="checkbox" name="outro" checked> Animated end card with @account</span></label>
+              </div>
+              <label class="ctx-text">Context text (blank = written from the video title)<input name="context_text" maxlength="80" placeholder="auto"></label>
+            </div>
+            <div class="row studio">
+              <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom</span></label>
+              <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean audio</span></label>
+            </div>
+            <div class="row end"><button type="button" class="android-only" data-pick="#quickForm">Pick video from phone</button><button class="primary" type="submit">Run full pipeline</button></div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Setup</h2>
+          <ul class="checks" id="toolList"><li class="muted">Checking tools…</li></ul>
+          <p class="muted small">Workspace: <a href="#" id="wsLink" class="mono">…</a></p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Live monitor</h2><a href="#" data-goto="monitor" class="small">All tasks →</a></div>
+        <div id="dashTasks" class="tasks"><p class="muted">Nothing running. Start a pipeline above or find a video first.</p></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Latest clips</h2><a href="#" data-goto="library" class="small">Library →</a></div>
+        <div id="dashClips" class="clipgrid"><p class="muted">No clips yet.</p></div>
+      </div>
+    </section>
+
+    <!-- FIND -->
+    <section class="page" id="page-find">
+      <h1>Find videos</h1>
+      <div class="tabs" id="findTabs"><button data-tab="trends" class="on">Trending videos</button><button data-tab="streams">Live streams</button></div>
+      <div class="card">
+        <form id="findForm" class="row">
+          <label class="grow">Search<input name="query" value="gta 6"></label>
+          <label data-only="trends">Last hours<input name="hours" type="number" min="1" max="168" value="24"></label>
+          <label>Max results<input name="limit" type="number" min="5" max="60" value="30"></label>
+          <label data-only="trends" class="chk"><span><input type="checkbox" name="deep" checked> Check "most replayed" on the top 8</span></label>
+          <button class="primary" type="submit">Search</button>
+        </form>
+        <div id="findTask" class="tasks"></div>
+      </div>
+      <div class="card"><div id="findResults"><p class="muted">Run a search to see results.</p></div></div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section class="page" id="page-pipeline">
+      <h1>Pipeline</h1>
+      <div class="stages">
+        <span>1 Download</span><span>2 Transcribe</span><span>3 Find the reaction</span><span>4 Cut</span><span>5 Punch in</span><span>6 Caption</span><span>7 Rule check</span><span>8 Ship</span>
+      </div>
+      <div class="card">
+        <form id="pipeForm" class="stack">
+          <label>Video URL or file path<input name="src" placeholder="https://www.youtube.com/watch?v=…" required></label>
+          <div class="row">
+            <label>Moments<input name="top" type="number" min="1" max="20" value="8"></label>
+            <label>Min sec<input name="min" type="number" min="5" max="120" value="15"></label>
+            <label>Max sec<input name="max" type="number" min="7" max="180" value="40"></label>
+            <label>Max minutes downloaded<input name="max_minutes" type="number" min="1" max="600" value="90"></label>
+            <label>Clips to cut<input name="clips" type="number" min="1" max="10" value="3"></label>
+          </div>
+          <div class="row">
+            <label>Layout<select name="layout"><option value="crop">Crop · follows the action</option><option value="blur">Blur background</option><option value="fill">Fill (centre crop)</option><option value="facecam">Facecam + gameplay</option><option value="react">Reaction</option></select></label>
+              <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="none">No webcam</option><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+            <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
+            <label class="grow">Hook<input name="hook" maxlength="80" placeholder="optional on-screen opener"></label>
+          </div>
+          <div class="brand-opts">
+              <div class="row">
+                <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label>Card style<select name="card_theme"><option value="vice">GTA VI (Vice)</option><option value="clean">Clean</option></select></label>
+                <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
+              </div>
+              <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
+              <div class="row studio">
+                <label class="chk"><span><input type="checkbox" name="context" checked> Context intro (what the video is about)</span></label>
+                <label class="chk"><span><input type="checkbox" name="outro" checked> Animated end card with @account</span></label>
+              </div>
+              <label class="ctx-text">Context text (blank = written from the video title)<input name="context_text" maxlength="80" placeholder="auto"></label>
+            </div>
+            <div class="row studio">
+            <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom on the peak</span></label>
+            <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean noisy audio</span></label>
+            <label class="chk"><span><input type="checkbox" name="fps60"> Smooth 60 fps (slow)</span></label>
+          </div>
+          <label>Post caption (checked for banned words and campaign hashtags)<input name="caption" placeholder="#GTA6 credit @creator"></label>
+          <div class="row end">
+            <button type="button" class="android-only" data-pick="#pipeForm">Pick video from phone</button>
+            <button type="button" id="momentsOnly">Find moments only</button>
+            <button class="primary" type="submit">Run full pipeline</button>
+          </div>
+        </form>
+        <div id="pipeTask" class="tasks"></div>
+      </div>
+      <div class="card" id="pipeJob"><p class="muted">Candidates of the last analyzed video show up here.</p></div>
+    </section>
+
+    <!-- LIVE -->
+    <section class="page" id="page-live">
+      <h1>Live mode</h1>
+      <p class="muted">Records a YouTube or Twitch live stream and cuts a clip each time chat explodes.</p>
+      <div class="card">
+        <form id="liveForm" class="stack">
+          <label>Live stream URL<input name="url" placeholder="https://twitch.tv/<channel> or a YouTube live URL" required></label>
+          <div class="row">
+            <label>Minutes<input name="minutes" type="number" min="1" max="600" value="60"></label>
+            <label>Spike ratio<input name="ratio" type="number" step="0.5" min="1.5" max="10" value="3"></label>
+            <label>Seconds before<input name="before" type="number" min="3" max="60" value="15"></label>
+            <label>Seconds after<input name="after" type="number" min="3" max="60" value="20"></label>
+          </div>
+          <div class="row end"><button class="primary" type="submit">Start recording</button></div>
+        </form>
+        <div id="liveTask" class="tasks"></div>
+      </div>
+    </section>
+
+    <!-- LONG-FORM -->
+    <section class="page" id="page-longform">
+      <header class="hero">
+        <div>
+          <h1>Long-form guide studio</h1>
+          <p>GTA 6 is about to make a lot of millionaires. Story-driven long-form videos hold their value and keep earning for years. This mode sets up a project in which Claude Code researches the niche, writes and fact-checks the script, voices it with ElevenLabs, builds the edit from official footage (via Apify), and grades every cut with fresh critics before uploading it as unlisted.</p>
+        </div>
+      </header>
+      <div class="card">
+        <h2>How it works</h2>
+        <ol class="steps">
+          <li><b>Study.</b> Claude finds the outliers in the niche and how the best ones are structured, or pitches concepts of its own from what players are discussing this week.</li>
+          <li><b>Story.</b> It writes three storylines, keeps the fully sourced one, and checks every claim against official sources.</li>
+          <li><b>Footage.</b> Apify collects official trailers and gameplay into a tagged library, so everything on screen is real footage.</li>
+          <li><b>Voice and music.</b> ElevenLabs voices the script with one locked professional voice and scores it; cuts land on the beat.</li>
+          <li><b>Build.</b> Claude writes an exact edit spec and builds it from a reusable component library.</li>
+          <li><b>Critics.</b> Fresh critics grade every cut blind, a judge ranks the fixes, and the loop repeats until it holds up next to the best channels.</li>
+        </ol>
+        <p class="muted small">Runs on a computer in <b>Claude Code</b>, with your own ElevenLabs, Apify and YouTube Data API accounts (their usage is billed by them). Vice Desk sets up the project; Claude Code does the work.</p>
+      </div>
+      <div class="card" id="aiCard">
+        <h2>AI model</h2>
+        <p class="muted small">Pick who writes, critiques and judges. Tap <b>Get API key</b> to sign in to the provider and create a key, then paste it here. Keys stay on this device and go only to that provider. Consumer subscriptions (ChatGPT Plus, Claude Pro) can't be used by other apps; these providers only allow API keys, billed per use.</p>
+        <div class="provs" id="aiProviders"></div>
+        <div class="row">
+          <label class="grow">API key<input id="aiKey" type="password" autocomplete="off" placeholder="paste your key"></label>
+          <button type="button" id="aiGetKey">Get API key</button>
+        </div>
+        <label id="aiBaseRow" hidden>Server address (OpenAI-compatible)<input id="aiBase" placeholder="http://192.168.1.20:11434/v1"></label>
+        <div class="row">
+          <label class="grow">Model<select id="aiModel"></select></label>
+          <button type="button" id="aiLoad">Load models</button>
+        </div>
+        <div class="row end"><span class="muted small" id="aiState"></span><button type="button" id="aiTest">Test</button><button type="button" class="primary" id="aiSave">Save</button></div>
+        <details class="small"><summary>Voice: ElevenLabs (optional)</summary>
+          <p class="muted small">With an ElevenLabs key the guide is voiced by a professional voice. Without one, a free Microsoft voice is used; on Android, the phone's own voice takes over if that can't be reached.</p>
+          <div class="row"><label class="grow">ElevenLabs API key<input id="elKey" type="password" autocomplete="off" placeholder="paste your key"></label>
+            <button type="button" id="elGetKey">Get key</button></div>
+          <label>Voice ID (optional; blank = first voice on your account)<input id="elVoice" placeholder="e.g. a voice ID from your ElevenLabs voice library"></label>
+          <div class="row end"><button type="button" id="elSave">Save voice settings</button></div>
+        </details>
+      </div>
+      <div class="card">
+        <h2>Make a guide here</h2>
+        <p class="muted small">Runs on this phone or PC with your AI model. In order:</p>
+        <ol class="small">
+          <li>Finds what's winning in the niche</li>
+          <li>Picks a concept</li>
+          <li>Writes and fact-tags the script</li>
+          <li>Runs three blind critics and a judge, then revises</li>
+          <li>Voices it</li>
+          <li>Builds a 1080p rough cut from official footage, with chapter cards and captions</li>
+          <li>Writes the title, description with chapters, and thumbnail</li>
+        </ol>
+        <p class="muted small">For the full studio quality (component library, multi-round critics, YouTube upload), use the Claude Code project below.</p>
+        <form id="lfRun" class="stack">
+          <div class="row">
+            <label class="grow">Topic (optional)<input name="topic" placeholder="e.g. every hidden beach in Leonida"></label>
+            <label>Idea from<select name="idea"><option value="outliers">What's winning now</option><option value="own">Its own concept</option></select></label>
+          </div>
+          <div class="row">
+            <label>Length (min)<input name="minutes" type="number" min="2" max="20" value="8"></label>
+            <label>Voice<select name="voice"><option value="auto">ElevenLabs if set, else free</option><option value="elevenlabs">ElevenLabs</option><option value="free">Free Microsoft voice (phone voice if offline)</option><option value="phone">Phone's built-in voice (Android, offline)</option><option value="none">No voice</option></select></label>
+          </div>
+          <label>Official footage URLs (optional, one per line; blank = Rockstar Games' own trailers)<textarea name="footage" rows="2" class="mono"></textarea></label>
+          <div class="row studio"><label class="chk"><span><input type="checkbox" name="fresh"> Start a new guide (otherwise resume the last one)</span></label></div>
+          <div class="row end"><button class="primary" type="submit">Make the guide</button></div>
+        </form>
+        <div id="lfTask" class="tasks"></div>
+      </div>
+      <h2 style="margin:22px 0 10px">Full studio in Claude Code</h2>
+      <div class="card">
+        <form id="lfForm" class="stack">
+          <div class="row">
+            <label class="grow">Channel name<input name="channel" placeholder="Vice City Guides" required></label>
+          </div>
+          <label>Topics<input name="topics" placeholder="map guides, mission walkthroughs, hidden locations, lore"></label>
+          <div class="row end"><button class="primary" type="submit">Create project</button></div>
+        </form>
+      </div>
+      <div class="card" id="lfResult" hidden>
+        <div class="card-h"><h2>Project ready</h2><button class="sm desk-only" id="lfOpen">Open folder</button></div>
+        <p class="mono small" id="lfPath"></p>
+        <ol class="steps">
+          <li>Install Claude Code on your computer: <code>npm install -g @anthropic-ai/claude-code</code></li>
+          <li>Copy <code>.env.example</code> to <code>.env</code> in the project folder and add your ElevenLabs, Apify and YouTube keys.</li>
+          <li>Open a terminal in the project folder, run <code>claude</code> and send: <code id="lfStart"></code></li>
+        </ol>
+        <p class="muted small">The full brief is saved as <code>CLAUDE.md</code> in the folder, and Claude reads it automatically. To use it elsewhere, copy it:</p>
+        <textarea id="lfPrompt" rows="8" class="mono" readonly></textarea>
+        <div class="row end"><button class="primary" id="lfCopy">Copy prompt</button></div>
+      </div>
+    </section>
+
+    <!-- LIBRARY -->
+    <section class="page" id="page-library">
+      <div class="card-h"><h1>Clips &amp; jobs</h1><div><button id="openWs" class="desk-only">Open folder</button> <button id="refreshJobs">Refresh</button></div></div>
+      <div id="jobs"><p class="muted">Loading…</p></div>
+    </section>
+
+    <!-- MONITOR -->
+    <section class="page" id="page-monitor">
+      <div class="card-h"><h1>Monitor</h1><button id="clearTasks">Clear finished</button></div>
+      <div class="monitor">
+        <div id="allTasks" class="tasks"><p class="muted">No tasks yet.</p></div>
+        <div class="card logcard"><div class="card-h"><h2 id="logTitle">Log</h2><label class="small"><input type="checkbox" id="follow" checked> follow</label></div><pre id="log" class="log">Select a task to see its live log.</pre></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <h1>Settings</h1>
+      <div class="card">
+        <form id="setForm" class="stack">
+          <label class="desk-only">Workspace folder (jobs, clips and reports go here)<input name="workspace" class="mono"></label>
+          <label>Start mode<select name="mode"><option value="clips">Short clips</option><option value="longform">Long-form guides</option></select></label>
+          <div class="row desk-only">
+            <label class="grow">Speech model (captions)<select name="whisper_model"></select></label>
+            <button type="button" id="dlModel">Download this model</button>
+          </div>
+          <div id="setModelTask" class="tasks"></div>
+          <div class="row">
+            <label class="grow">Twitch Client-ID (optional)<input name="twitch_client_id" autocomplete="off"></label>
+            <label class="grow">Twitch token (optional)<input name="twitch_token" type="password" autocomplete="off" placeholder="leave empty to keep"></label>
+          </div>
+          <div class="row end"><button class="primary" type="submit">Save</button></div>
+        </form>
+      </div>
+      <div class="card" id="cookieCard">
+        <h2>YouTube sign-in <span class="muted small">(fixes "Sign in to confirm you're not a bot")</span></h2>
+        <p class="muted small">YouTube sometimes blocks downloads until it sees a signed-in session. Vice Desk then sends that session's cookies with every request. They stay on this device. A spare Google account is safest.</p>
+        <p id="cookieState" class="small"></p>
+        <div class="row android-only"><button class="primary" id="ytLogin">Sign in to YouTube</button></div>
+        <div class="row desk-only">
+          <label class="grow">Use cookies from your browser<select id="cookieBrowser">
+            <option value="">Off</option><option value="firefox">Firefox (most reliable)</option><option value="chrome">Chrome</option>
+            <option value="edge">Edge</option><option value="brave">Brave</option><option value="opera">Opera</option><option value="vivaldi">Vivaldi</option>
+            <option value="chromium">Chromium</option><option value="safari">Safari</option></select></label>
+          <button id="saveBrowser">Use this browser</button>
+        </div>
+        <details class="small"><summary>Paste a cookies.txt instead</summary>
+          <p class="muted small">Export cookies for youtube.com with a "cookies.txt" browser add-on while signed in, then paste the whole file here.</p>
+          <textarea id="cookieText" rows="5" class="mono" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;...&#9;SID&#9;..."></textarea>
+          <div class="row end"><button id="saveCookieText" class="primary">Save cookies</button></div>
+        </details>
+        <div class="row end"><button id="clearCookies" class="danger">Remove saved cookies</button></div>
+      </div>
+      <div class="card">
+        <h2>Campaign rules <span class="muted small">(campaigns.md, used by the rule check)</span></h2>
+        <p class="muted small">Lines understood: <code>min_seconds: 15</code> · <code>max_seconds: 60</code> · <code>required_hashtags: #a #b</code> · <code>required_mention: @x</code></p>
+        <textarea id="campaigns" rows="8" class="mono"></textarea>
+        <div class="row end"><button id="saveCamp" class="primary">Save rules</button></div>
+      </div>
+      <div class="card">
+        <h2>About</h2>
+        <p class="muted small" id="about"></p>
+        <div class="row desk-only"><button id="quitBtn" class="danger">Quit Vice Desk</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="modePick" class="overlay" hidden>
+  <div class="welcome">
+    <div class="brand"><span class="logo">V</span><div><b>Welcome to Vice Desk</b><small>what are you making?</small></div></div>
+    <h1>Choose how you'll work</h1>
+    <div class="models">
+      <div class="model rec"><b>Short clips</b><span class="sz">TikTok · Reels · Shorts</span><p>Find trending GTA 6 videos and streams, pick the best moments, and cut vertical clips with captions, crop tracking, GTA VI cards and your @account.</p><button class="primary" data-mode="clips">Make short clips</button></div>
+      <div class="model"><b>Long-form guides</b><span class="sz">YouTube · Claude Code</span><p>Story-driven map guides, walkthroughs and lore videos that keep earning for years: researched, fact-checked, voiced and edited by Claude Code with ElevenLabs and Apify.</p><button data-mode="longform">Set up long-form</button></div>
+    </div>
+    <p class="muted small">You can switch any time in Settings.</p>
+  </div>
+</div>
+<div id="firstRun" class="overlay" hidden>
+  <div class="welcome">
+    <div class="brand"><span class="logo">V</span><div><b>Welcome to Vice Desk</b><small>one-time setup</small></div></div>
+    <h1>Choose your speech model</h1>
+    <p class="muted">It writes the word-by-word captions on your clips. It downloads once, then everything runs offline. You can change it later in Settings.</p>
+    <div id="modelCards" class="models"></div>
+    <div id="modelTask" class="tasks"></div>
+    <div class="row end"><a href="#" id="skipModel" class="small">Skip for now (clips without captions)</a></div>
+  </div>
+</div>
+<dialog id="clipDialog">
+  <form id="clipForm" method="dialog" class="stack">
+    <div class="card-h"><h2>Clip this video</h2><button type="button" id="clipClose">✕</button></div>
+    <p class="muted small" id="clipTitle"></p>
+    <input type="hidden" name="src">
+    <div class="row">
+      <label>Clips<input name="clips" type="number" min="1" max="10" value="3"></label>
+      <label>Layout<select name="layout"><option value="crop">Crop · follows the action</option><option value="blur">Blur background</option><option value="fill">Fill (centre crop)</option><option value="facecam">Facecam + gameplay</option><option value="react">Reaction</option></select></label>
+      <label>Platform<select name="platform"><option value="vertical">TikTok · Reels · Shorts (9:16)</option><option value="landscape">YouTube · X (16:9)</option><option value="feed">Instagram feed (4:5)</option><option value="square">Square (1:1)</option></select></label>
+              <label class="cam-only" hidden>Webcam position<select name="cam"><option value="none">No webcam</option><option value="auto" class="desk-only">Auto-detect</option><option value="top-left">Top left</option><option value="top-right">Top right</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option></select></label>
+      <label>Captions<select name="captions"><option value="word">Word by word</option><option value="bubble">Bubble</option><option value="none">None</option></select></label>
+    </div>
+    <label>Hook (optional)<input name="hook" maxlength="80" placeholder="Nobody noticed this"></label>
+    <div class="brand-opts">
+              <div class="row">
+                <label class="bg-only">Background<select name="bg"><option value="blur">Blurred video</option><option value="tint">Tinted blur</option><option value="solid">Solid colour</option></select></label>
+                <label>Card style<select name="card_theme"><option value="vice">GTA VI (Vice)</option><option value="clean">Clean</option></select></label>
+                <label class="grow">Your @account (end card)<input name="handle" placeholder="@yourpage" autocomplete="off" maxlength="40"></label>
+              </div>
+              <div class="palette bg-color-only" hidden><span class="muted small">Colour</span><label class="sw" title="Vice pink"><input type="radio" name="bg_color" value="vice" checked><i style="--c:#e8457f"></i></label><label class="sw" title="Sunset"><input type="radio" name="bg_color" value="sunset"><i style="--c:#ff7a3d"></i></label><label class="sw" title="Gold"><input type="radio" name="bg_color" value="gold"><i style="--c:#f5c542"></i></label><label class="sw" title="Mint"><input type="radio" name="bg_color" value="mint"><i style="--c:#3ddc97"></i></label><label class="sw" title="Ocean"><input type="radio" name="bg_color" value="ocean"><i style="--c:#2f8cff"></i></label><label class="sw" title="Neon purple"><input type="radio" name="bg_color" value="neon"><i style="--c:#9b5cff"></i></label><label class="sw" title="Night"><input type="radio" name="bg_color" value="night"><i style="--c:#141018"></i></label><label class="sw" title="Snow"><input type="radio" name="bg_color" value="snow"><i style="--c:#f4f1ec"></i></label></div>
+              <div class="row studio">
+                <label class="chk"><span><input type="checkbox" name="context" checked> Context intro (what the video is about)</span></label>
+                <label class="chk"><span><input type="checkbox" name="outro" checked> Animated end card with @account</span></label>
+              </div>
+              <label class="ctx-text">Context text (blank = written from the video title)<input name="context_text" maxlength="80" placeholder="auto"></label>
+            </div>
+            <div class="row studio">
+      <label class="chk"><span><input type="checkbox" name="punch" checked> Punch-in zoom</span></label>
+      <label class="chk"><span><input type="checkbox" name="clean_audio"> Clean audio</span></label>
+      <label class="chk desk-only"><span><input type="checkbox" name="fps60"> Smooth 60 fps (slow)</span></label>
+    </div>
+    <div class="row end"><button type="button" id="clipMore">More options…</button><button class="primary" type="submit">Start clipping</button></div>
+  </form>
+</dialog>
+<div id="toast" class="toast" hidden></div>
+<dialog id="player"><div class="card-h"><b id="playerTitle"></b><button id="closePlayer">Close</button></div><video id="video" controls playsinline></video></dialog>
+<script src="app.js"></script>
+</body>
+</html>

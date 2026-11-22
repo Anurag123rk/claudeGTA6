@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ViceTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/vice_bg</item>
+        <item name="android:statusBarColor">@color/vice_bg</item>
+        <item name="android:navigationBarColor">@color/vice_bg</item>
+        <item name="android:colorAccent">@color/vice_pink</item>
+        <item name="android:colorPrimary">@color/vice_bg</item>
+    </style>
+    <color name="vice_bg">#FF140B18</color>
+    <color name="vice_pink">#FFE8457F</color>
+</resources>

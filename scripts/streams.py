@@ -4,12 +4,11 @@ usage: python streams.py --query "gta 6" --limit 20 --out streams.md
 YouTube always. Twitch always (Helix if TWITCH_CLIENT_ID and TWITCH_TOKEN are set, else keyless public GQL). Kick is tried once, skipped silently on failure.
 Viewer counts are exactly what the platform returned at run time.
 """
-import argparse, json, os, sys, time
-from concurrent.futures import ThreadPoolExecutor
+import argparse, os, sys, time
 from pathlib import Path
 from urllib.parse import quote_plus
 sys.path.insert(0, str(Path(__file__).parent))
-from common import ytdlp_base, ytdlp_json, run
+from common import stage, ytdl_search
 
 try:
     import truststore
@@ -26,32 +25,20 @@ def fmt_dur(sec):
 
 
 def youtube(query, limit):
+    """One request: YouTube's live-now search filter already carries each stream's concurrent viewers."""
     url = f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp=EgJAAQ%253D%253D"
-    r = run(ytdlp_base() + ["--flat-playlist", "-J", "--playlist-end", str(limit), url], capture=True, check=False)
-    if r.returncode != 0 or not r.stdout.strip():
-        print(f"youtube search failed: {(r.stderr or '')[-300:]}", file=sys.stderr)
+    try:
+        entries = ytdl_search(url, limit)
+    except Exception as e:
+        print(f"youtube search failed: {str(e)[:300]}", file=sys.stderr)
         return []
-    ids = []
-    for e in json.loads(r.stdout).get("entries") or []:
-        if e and e.get("id"):
-            ids.append(e.get("url") or f"https://www.youtube.com/watch?v={e['id']}")
-
-    def one(u):
-        try:
-            return ytdlp_json(u)
-        except BaseException:  # run() calls sys.exit on failure
-            return None
-
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        infos = list(ex.map(one, ids))
-    now = time.time(); out = []
-    for i in infos:
-        if not i or not i.get("is_live"):
+    out = []
+    for e in entries:
+        if e.get("live_status") != "is_live":
             continue
-        start = i.get("release_timestamp") or i.get("timestamp")
-        out.append({"platform": "YouTube", "channel": i.get("channel") or i.get("uploader") or "",
-                    "title": i.get("title") or "", "url": i.get("webpage_url") or "",
-                    "viewers": i.get("concurrent_view_count"), "live_for": fmt_dur(now - start) if start else ""})
+        out.append({"platform": "YouTube", "channel": e.get("channel") or e.get("uploader") or "",
+                    "title": e.get("title") or "", "url": e.get("url") or f"https://www.youtube.com/watch?v={e.get('id')}",
+                    "viewers": e.get("concurrent_view_count"), "live_for": ""})
     return out
 
 
@@ -117,12 +104,15 @@ def main():
     ap.add_argument("--query", default="gta 6"); ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--out", default="streams.md")
     a = ap.parse_args()
+    stage(1, 3, "YouTube live")
     sections = [("YouTube", youtube(a.query, a.limit))]
+    stage(2, 3, "Twitch live")
     t = twitch(a.query)
     if t:
         t = sorted(t, key=lambda r: r["viewers"] or -1, reverse=True)[:a.limit]
     if t is not None:
         sections.append(("Twitch", t))
+    stage(3, 3, "Kick live")
     k = kick(a.query)
     if k:
         sections.append(("Kick", k))
